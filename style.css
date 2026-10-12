@@ -21,3 +21,6 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 6px;b
 svg text{fill:var(--mut);font-size:10px}h2{font-size:17px;margin:4px 0 8px}h3{font-size:15px;margin:6px 0}
 .note{border-left:4px solid var(--warn);padding-left:10px}
 svg{max-height:220px;display:block;margin:auto}
+.ch .grid{stroke:var(--line);stroke-width:1}.ch .axis{stroke:var(--mut);stroke-width:1}.ch .at{font-size:10.5px;font-weight:600;fill:var(--fg)}.ch .pl{font-size:9px;fill:var(--fg)}
+.chip i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+svg.ch{max-height:300px}

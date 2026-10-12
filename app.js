@@ -4,13 +4,27 @@ $('#theme').onclick=()=>{const c=document.documentElement.dataset.theme||(matchM
 const f=(v,d=0)=>v==null?'—':(+v).toFixed(d), pct=v=>v==null?'—':Math.round(v*100)+'%';
 function icon(d){const s=(d.sky||'').toLowerCase();if((d.snow_in||0)>=0.5)return'🌨️';if(d.pop>=.5)return'🌧️';if(d.pop>=.25)return'🌦️';if(d.gust_mph>=35)return'💨';
  if(s.includes('cloudy')&&!s.includes('partly')&&!s.includes('mostly sunny'))return'☁️';if(s.includes('partly'))return'⛅';if(s.includes('mostly'))return'🌤️';return'☀️'}
-function chart(days,series,h=120){const W=320,pad=24,n=days.length,xs=i=>pad+i*(W-pad-6)/(n-1);let mx=Math.max(1,...series.flatMap(s=>days.map(s.v).filter(x=>x!=null)),...series.map(s=>s.line||0));
- const ys=v=>h-18-(v/mx)*(h-30);let g=`<svg viewBox="0 0 ${W} ${h}" width="100%" role="img">`;
- series.forEach(s=>{if(s.line)g+=`<line x1="${pad}" x2="${W}" y1="${ys(s.line)}" y2="${ys(s.line)}" stroke="${s.c}" stroke-dasharray="4 3" opacity=".7"/><text x="${W-4}" y="${ys(s.line)-3}" text-anchor="end">${s.lt}</text>`;
-  if(s.bar)days.forEach((d,i)=>{const v=s.v(d);if(v!=null)g+=`<rect x="${xs(i)-6}" y="${ys(v)}" width="12" height="${h-18-ys(v)}" rx="3" fill="${s.c}" opacity=".75"/>`});
-  else{const p=days.map((d,i)=>s.v(d)==null?null:`${xs(i)},${ys(s.v(d))}`).filter(Boolean);g+=`<polyline fill="none" stroke="${s.c}" stroke-width="2.5" points="${p.join(' ')}"/>`;days.forEach((d,i)=>{if(s.v(d)!=null)g+=`<circle cx="${xs(i)}" cy="${ys(s.v(d))}" r="3" fill="${s.c}"/>`})}});
- days.forEach((d,i)=>g+=`<text x="${xs(i)}" y="${h-4}" text-anchor="middle">${d.dow}</text>`);g+=`<text x="2" y="10">${f(mx)}</text></svg>`;
- return g+`<div class="chips">${series.map(s=>`<span class="chip" style="border-left:8px solid ${s.c}">${s.n}</span>`).join('')}</div>`}
+function nice(lo,hi,n=5){if(hi<=lo)hi=lo+1;const r=(hi-lo)/n,p=Math.pow(10,Math.floor(Math.log10(r))),st=[1,2,2.5,5,10].map(m=>m*p).find(m=>m>=r);return{lo:Math.floor(lo/st)*st,hi:Math.ceil(hi/st)*st,st}}
+// series: {n,u,c,v,bar,ax:'L'|'R',dp}; o: {L:{t,min,max},R:{t,min,max},lines:[{y,ax,c,t}],xt}
+function chart(days,series,o={}){const W=360,H=200,l=44,r=o.R?50:12,t=12,b=40,n=days.length,pw=W-l-r,ph=H-t-b,xs=i=>l+(i+.5)*pw/n;
+ const sc={};['L','R'].forEach(k=>{if(!o[k])return;const vals=series.filter(s=>(s.ax||'L')==k).flatMap(s=>days.map(s.v)).filter(x=>x!=null).concat((o.lines||[]).filter(x=>(x.ax||'L')==k).map(x=>x.y));
+  let lo=o[k].min??Math.min(...vals),hi=o[k].max??Math.max(...vals);if(o[k].min==null&&lo>0&&!o[k].tight)lo=0;const N=nice(lo,hi);sc[k]={...N,y:v=>t+ph-(v-N.lo)/(N.hi-N.lo)*ph}});
+ let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" class="ch">`;const L=sc.L;
+ for(let v=L.lo;v<=L.hi+1e-9;v+=L.st){g+=`<line x1="${l}" x2="${W-r}" y1="${L.y(v)}" y2="${L.y(v)}" class="grid"/><text x="${l-5}" y="${L.y(v)+3}" text-anchor="end">${+v.toFixed(2)}</text>`}
+ if(sc.R){const R=sc.R;for(let v=R.lo;v<=R.hi+1e-9;v+=R.st)g+=`<text x="${W-r+5}" y="${R.y(v)+3}">${+v.toFixed(2)}</text>`}
+ g+=`<line x1="${l}" x2="${l}" y1="${t}" y2="${t+ph}" class="axis"/><line x1="${l}" x2="${W-r}" y1="${t+ph}" y2="${t+ph}" class="axis"/>`;
+ if(sc.R)g+=`<line x1="${W-r}" x2="${W-r}" y1="${t}" y2="${t+ph}" class="axis"/>`;
+ g+=`<text class="at" transform="translate(11 ${t+ph/2}) rotate(-90)" text-anchor="middle">${o.L.t}</text>`;
+ if(sc.R)g+=`<text class="at" transform="translate(${W-8} ${t+ph/2}) rotate(90)" text-anchor="middle">${o.R.t}</text>`;
+ const nb=series.filter(s=>s.bar).length;let bi=0;
+ series.forEach(s=>{const S=sc[s.ax||'L'],dp=s.dp??0;
+  if(s.bar){const bw=Math.min(16,pw/n*.6/nb),off=(bi++-(nb-1)/2)*bw;days.forEach((d,i)=>{const v=s.v(d);if(v!=null){const y0=S.y(Math.max(0,S.lo));g+=`<rect x="${xs(i)-bw/2+off}" y="${Math.min(S.y(v),y0)}" width="${bw-1}" height="${Math.abs(y0-S.y(v))}" rx="2" fill="${s.c}" opacity=".75"><title>${d.dow}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></rect>`}})}
+  else{const p=days.map((d,i)=>s.v(d)==null?null:`${xs(i)},${S.y(s.v(d))}`).filter(Boolean);g+=`<polyline fill="none" stroke="${s.c}" stroke-width="2.2" points="${p.join(' ')}"/>`;
+   days.forEach((d,i)=>{const v=s.v(d);if(v!=null)g+=`<circle cx="${xs(i)}" cy="${S.y(v)}" r="3.2" fill="${s.c}"><title>${d.dow}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></circle>`+(s.lab?`<text x="${xs(i)}" y="${S.y(v)-6}" text-anchor="middle" class="pl">${(+v).toFixed(dp)}</text>`:'')})}});
+ (o.lines||[]).forEach(x=>{const S=sc[x.ax||'L'];g+=`<line x1="${l}" x2="${W-r}" y1="${S.y(x.y)}" y2="${S.y(x.y)}" stroke="${x.c}" stroke-width="1.5" stroke-dasharray="5 3"/><text x="${W-r-3}" y="${S.y(x.y)-4}" text-anchor="end" style="fill:${x.c}">${x.t}</text>`});
+ days.forEach((d,i)=>g+=`<text x="${xs(i)}" y="${t+ph+14}" text-anchor="middle">${d.dow}</text>`);
+ g+=`<text class="at" x="${l+pw/2}" y="${H-4}" text-anchor="middle">${o.xt||'Day (6am–6am MT)'}</text></svg>`;
+ return g+`<div class="chips">${series.map(s=>`<span class="chip"><i style="background:${s.c}"></i>${s.n} (${s.u})${s.ax=='R'?' →':o.R?' ←':''}</span>`).join('')}${(o.lines||[]).map(x=>`<span class="chip"><i style="background:${x.c};height:2px"></i>${x.t}</span>`).join('')}</div>`}
 const nwsTxt=d=>d.nws.length?d.nws.map(p=>`<div><b>${p.name}</b>: ${p.short} · ${p.temp}°F · PoP ${p.pop}% · ${p.wind}</div>`).join(''):'<div class="muted">No NWS period</div>';
 const amt=d=>d.pop<.1?'dry':`${f(d.med_in,2)}–${f(d.q90_in,2)}″`;
 function dayCard(d,temps){return `<div class="card day" onclick="this.classList.toggle('open')"><div><div class="dow">${d.d==1?'Today':d.dow}</div><div class="muted">${d.date.slice(5)}</div></div>
@@ -19,8 +33,8 @@ function dayCard(d,temps){return `<div class="card day" onclick="this.classList.
 <div class="more"><div class="muted">${d.label} · basis: ${d.basis}-corrected · NBM PoP ${pct(d.nbm_pop)}, QPF ${f(d.nbm_qpf_in,2)}″</div><h3>NWS forecast</h3>${nwsTxt(d)}</div></div>`}
 const V={
 hawk(){const s=D.sites.wsmr_hawk;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>
-<div class="card">${chart(s.days,[{n:'High °F',c:'#ef4444',v:d=>+d.hi||null},{n:'Low °F',c:'#3b82f6',v:d=>+d.lo||null}])}</div>
-<div class="card">${chart(s.days,[{n:'Rain chance %',c:'#0ea5e9',bar:1,v:d=>d.pop*100},{n:'Gust mph',c:'#f59e0b',v:d=>d.gust_mph}])}</div>
+<div class="card">${chart(s.days,[{n:'High',u:'°F',c:'#ef4444',v:d=>+d.hi||null,lab:1},{n:'Low',u:'°F',c:'#3b82f6',v:d=>+d.lo||null,lab:1}],{L:{t:'Temperature (°F)',tight:1}})}</div>
+<div class="card">${chart(s.days,[{n:'Rain chance',u:'%',c:'#0ea5e9',bar:1,v:d=>d.pop*100},{n:'Max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,ax:'R'}],{L:{t:'Rain chance (%)',min:0,max:100},R:{t:'Max gust (mph)',min:0}})}</div>
 ${s.days.map(d=>dayCard(d,1)).join('')}
 <div class="card"><h3>Storm / weather notes</h3>${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p>Nothing notable in the next 10 days.</p>'}
 <details><summary>Pattern discussion (troughs, moisture, ensemble agreement)</summary><ul>${D.hawk_disc.join('')}</ul></details>
@@ -28,8 +42,8 @@ ${s.days.map(d=>dayCard(d,1)).join('')}
 pass(){const s=D.sites.san_augustin_pass,a=D.pass_alert,T=D.thresholds;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>
 <div class="status ${a.alert?'al':'ok'}"><b>${a.alert?'⚠️ ALERT':'✓ No alert'}</b>${a.alert?a.reasons.join('<br>'):'No high wind, low visibility, or snow forecast in the next 10 days'}</div>
 ${a.near.length?`<div class="card note"><h3>Near threshold</h3>${a.near.map(x=>`<div>${x}</div>`).join('')}</div>`:''}
-<div class="card"><h3>Gusts (mph)</h3>${chart(s.days,[{n:'Corrected max gust',c:'#f59e0b',v:d=>d.gust_mph,line:T.gust_mph,lt:'alert '+T.gust_mph}])}</div>
-<div class="card"><h3>Visibility & snow</h3>${chart(s.days,[{n:'NBM P(vis<1 mi) %',c:'#a855f7',bar:1,v:d=>d.p_vis_lt1==null?null:d.p_vis_lt1*100},{n:'NBM snow ×10 (in)',c:'#38bdf8',v:d=>d.snow_in==null?null:d.snow_in*10}])}
+<div class="card"><h3>Gusts (mph)</h3>${chart(s.days,[{n:'Corrected max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1},{n:'Corrected max wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph}],{L:{t:'Speed (mph)',min:0},lines:[{y:T.gust_mph,c:'#dc2626',t:'Gust alert '+T.gust_mph+' mph'}]})}</div>
+<div class="card"><h3>Visibility & snow</h3>${chart(s.days,[{n:'NBM chance vis < 1 mi',u:'%',c:'#a855f7',bar:1,v:d=>d.p_vis_lt1==null?null:d.p_vis_lt1*100},{n:'NBM snowfall',u:'in',c:'#38bdf8',v:d=>d.snow_in,ax:'R',dp:1}],{L:{t:'Chance vis < 1 mi (%)',min:0,max:100},R:{t:'Snowfall (in)',min:0,max:Math.max(1,...s.days.map(d=>d.snow_in||0))},lines:[{y:D.thresholds.p_vis*100,c:'#a855f7',t:'Vis alert '+D.thresholds.p_vis*100+'%'}]})+'<h3 style="margin-top:10px">HRRR minimum visibility, days 1–2</h3>'+chart(s.days.slice(0,2),[{n:'HRRR min visibility',u:'mi',c:'#10b981',bar:1,v:d=>d.vis_min_mi,dp:1}],{L:{t:'Visibility (mi)',min:0},lines:[{y:1,c:'#dc2626',t:'1 mi alert'}]})}
 <p class="muted">HRRR min visibility: day 1 ${f(s.days[0].vis_min_mi,1)} mi, day 2 ${f(s.days[1].vis_min_mi,1)} mi. Visibility/snow are raw model output (not locally verified). Thresholds: gust ≥${T.gust_mph} mph, wind ≥${T.wind_mph} mph, vis &lt;${T.vis_mi} mi, any snow.</p></div>
 ${s.days.map(d=>dayCard(d,0)).join('')}`},
 cloud(){const s=D.sites.cloudcroft,w=s.days.filter(d=>D.weekend.includes(d.d));return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2><h3>This weekend</h3>
@@ -38,8 +52,8 @@ cloud(){const s=D.sites.cloudcroft,w=s.days.filter(d=>D.weekend.includes(d.d));r
 about(){const t=(rows,cols,hd)=>`<table><tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`).join('')}</table>`;const S=D.skill;
  return `<h2>Model accuracy & about</h2><div class="card"><p>Forecasts are corrections of HRRR (days 1–2) and GEFS/ECMWF/NBM ensembles (days 1–10), trained on local station and gauge history (2023–2026) with terrain features. Lower error = better.</p>
 <p class="muted">Issued ${D.issued}. Guidance: HRRR ${D.guidance.hrrr||'n/a'}, NBM ${D.guidance.nbm}, GEFS ${D.guidance.gefs}, ECMWF ${D.guidance.ecmwf}.${D.notes.length?' Notes: '+D.notes.join('; '):''}</p></div>
-<div class="card"><h3>Daily rain chance (Brier score, lower better) by lead day</h3>${chart(S.lr_precip.map(r=>({dow:'D'+r.key,...r})),[{n:'NBM',c:'#94a3b8',v:r=>r.BS_nbm*100},{n:'This model',c:'#2563eb',v:r=>r.BS_model*100}])}</div>
-<div class="card"><h3>Daily max gust error (MAE m/s) by lead day</h3>${chart(S.lr_wind.filter(r=>r.var=='gmax').map(r=>({dow:'D'+r.lead_day,...r})),[{n:'NBM (height+bias adj.)',c:'#94a3b8',v:r=>r.MAE_nbm_hadj_biascorr},{n:'This model',c:'#f59e0b',v:r=>r.MAE_model}])}</div>
+<div class="card"><h3>Daily rain-chance accuracy by lead day</h3>${chart(S.lr_precip.filter(r=>/^\d+$/.test(String(r.key))).map(r=>({dow:'D'+r.key,...r})),[{n:'NBM',u:'Brier',c:'#94a3b8',v:r=>r.BS_nbm,dp:3},{n:'This model',u:'Brier',c:'#2563eb',v:r=>r.BS_model,dp:3},{n:'Climatology',u:'Brier',c:'#cbd5e1',v:r=>r.BS_clim,dp:3}],{L:{t:'Brier score (0–1, lower better)',min:0},xt:'Forecast lead day'})}</div>
+<div class="card"><h3>Daily max gust error by lead day (mph, lower better)</h3>${chart(S.lr_wind.filter(r=>r.var=='gmax'&&/^\d+$/.test(String(r.lead_day))).sort((a,b)=>a.lead_day-b.lead_day).map(r=>({dow:'D'+r.lead_day,...r})),[{n:'NBM (height+bias adj.)',u:'mph',c:'#94a3b8',v:r=>r.MAE_nbm_hadj_biascorr==null?null:r.MAE_nbm_hadj_biascorr*2.237,dp:1},{n:'This model',u:'mph',c:'#f59e0b',v:r=>r.MAE_model==null?null:r.MAE_model*2.237,dp:1}],{L:{t:'Mean abs. error (mph)',min:0},xt:'Forecast lead day'})}</div>
 <details class="card"><summary>Day 1 rain amount by station</summary>${t(S.day1_precip,['target','n','MAE_hrrr','MAE_median','cov_q90'],['Station','n','HRRR MAE mm','Model MAE mm','90% cover'])}</details>
 <details class="card"><summary>Caveats</summary><ul><li>No on-site wind record at Hawk St or the Pass; winds transfer from nearby stations.</li><li>Rain gauges undercatch snow; snow skill is weak.</li><li>Visibility, smoke and snow are raw model output.</li></ul></details>`}};
 function show(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));$('#app').innerHTML=V[t]();location.hash=t;scrollTo(0,0)}
