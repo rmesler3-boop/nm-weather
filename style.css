@@ -20,3 +20,4 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 6px;b
 .wk{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.big{font-size:28px;font-weight:800}
 svg text{fill:var(--mut);font-size:10px}h2{font-size:17px;margin:4px 0 8px}h3{font-size:15px;margin:6px 0}
 .note{border-left:4px solid var(--warn);padding-left:10px}
+svg{max-height:220px;display:block;margin:auto}
