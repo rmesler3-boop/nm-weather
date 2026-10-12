@@ -1,11 +1,12 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#2563eb" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="NM Wx">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <title>NM Local Weather</title><link rel="stylesheet" href="style.css"></head>
-<body><header><div class="top"><h1>NM Local Weather</h1><button id="theme" aria-label="Toggle theme">◐</button></div>
-<div id="issued" class="muted"></div>
-<nav id="tabs"><button data-t="hawk">Hawk St</button><button data-t="pass">The Pass</button><button data-t="cloud">Cloudcroft</button><button data-t="about">Accuracy</button></nav></header>
+<body><header><div class="top"><select id="loc" aria-label="Location"><option value="wsmr_hawk">Hawk St · WSMR</option><option value="san_augustin_pass">San Augustin Pass</option><option value="cloudcroft">Cloudcroft</option></select>
+<div class="topbtns"><button data-p="maps" title="Maps">🗺️</button><button data-p="seas" title="Seasonal">📅</button><button data-p="about" title="Accuracy & about">ℹ️</button><button id="theme" aria-label="Toggle theme">◐</button></div></div></header>
 <main id="app"><p class="muted">Loading…</p></main>
-<script src="app.js"></script></body></html>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script src="app.js" defer></script></body></html>
