@@ -26,9 +26,12 @@ function chart(days,series,o={}){const W=360,H=200,l=44,r=o.R?50:12,t=12,b=40,n=
  g+=`<text class="at" x="${l+pw/2}" y="${H-4}" text-anchor="middle">${o.xt||'Day (6am–6am MT)'}</text></svg>`;
  return g+`<div class="chips">${series.map(s=>`<span class="chip"><i style="background:${s.c}"></i>${s.n} (${s.u})${s.ax=='R'?' →':o.R?' ←':''}</span>`).join('')}${(o.lines||[]).map(x=>`<span class="chip"><i style="background:${x.c};height:2px"></i>${x.t}</span>`).join('')}</div>`}
 const nwsTxt=d=>d.nws.length?d.nws.map(p=>`<div><b>${p.name}</b>: ${p.short} · ${p.temp}°F · PoP ${p.pop}% · ${p.wind}</div>`).join(''):'<div class="muted">No NWS period</div>';
-const amt=d=>d.pop<.1?'dry':`${f(d.med_in,2)}–${f(d.q90_in,2)}″`;
+const amt=d=>{const a=d.amt||{};return `${f(a.mean_in,2)}″ exp. (${f(a.med_in,2)}–${f(a.q90_in,2)}″)`};
+const accChips=d=>{const a=d.amt||{};return ((a.snow_in||0)>=0.05?`<span class="chip">❄️ snow ${f(a.snow_in,1)}″</span>`:'')+((a.ice_in||0)>=0.005?`<span class="chip">🧊 ice ${f(a.ice_in,2)}″</span>`:'')};
+function totalCard(key,title){const t=D.totals[key];return `<div class="card total"><div class="muted">${title}</div><div class="big">💧 ${f(t.mean_in,2)}″ <span class="muted" style="font-size:14px">expected liquid</span></div><div class="muted">High end: up to ${f(t.q90sum_in,2)}″ (sum of daily 90th pct) · wettest day 90th pct ${f(t.wettest_q90,2)}″${t.snow_in>=0.05?` · ❄️ snow ${f(t.snow_in,1)}″`:''}${(t.ice_in||0)>=0.005?` · 🧊 ice ${f(t.ice_in,2)}″`:''}</div></div>`}
+function amtChart(ds,title){return `<div class="card"><h3>${title||'Expected precipitation'}</h3>`+chart(ds,[{n:'Expected liquid (mean)',u:'in',c:'#0284c7',bar:1,v:d=>d.amt&&d.amt.mean_in,dp:2},{n:'Likely high end (90th pct)',u:'in',c:'#64748b',v:d=>d.amt&&d.amt.q90_in,dp:2}].concat(ds.some(d=>d.amt&&d.amt.snow_in>=0.05)?[{n:'Snow',u:'in',c:'#a5b4fc',bar:1,v:d=>d.amt&&d.amt.snow_in,dp:1}]:[]),{L:{t:'Amount (in)',min:0}})+`<p class="muted">Expected = recalibrated mean (chance × typical wet-day amount). Range on cards: median–90th percentile.</p></div>`}
 function dayCard(d,temps){return `<div class="card day" onclick="this.classList.toggle('open')"><div><div class="dow">${d.d==1?'Today':d.dow}</div><div class="muted">${d.date.slice(5)}</div></div>
-<div class="ic">${icon(d)}</div><div>${d.sky?`<div>${d.sky}</div>`:''}<div class="chips"><span class="chip r">💧 ${pct(d.pop)} · ${amt(d)}</span><span class="chip w">💨 ${f(d.wind_mph)} g${f(d.gust_mph)} mph</span>${(d.snow_in||0)>=.1?`<span class="chip">❄️ ${f(d.snow_in,1)}″</span>`:''}${hzChips(d)}</div></div>
+<div class="ic">${icon(d)}</div><div>${d.sky?`<div>${d.sky}</div>`:''}<div class="chips"><span class="chip r">💧 ${pct(d.pop)} · ${amt(d)}</span>${accChips(d)}<span class="chip w">💨 ${f(d.wind_mph)} g${f(d.gust_mph)} mph</span>${hzChips(d)}</div></div>
 <div class="temps">${temps?`${d.hi}°<br><span>${d.lo}°</span>`:''}</div>
 <div class="more"><div class="muted">${d.label} · basis: ${d.basis}-corrected · NBM PoP ${pct(d.nbm_pop)}, QPF ${f(d.nbm_qpf_in,2)}″</div>${hzDetail(d)}<h3>NWS forecast</h3>${nwsTxt(d)}</div></div>`}
 const HZI={'thunder':'⚡ Thunder','hail':'🧊 Hail','freezing rain':'🧊 Freezing rain','sleet':'🌨️ Sleet'};
@@ -46,23 +49,23 @@ function thunderChart(s,ds){const wk=!!ds;ds=ds||s.days;let g=`<div class="card"
  return g+`<p class="muted">SPC outlooks (days 1–3) shown as badges on the day cards.</p></div>`}
 function hzCharts(s){return ptypeChart(s)+thunderChart(s)}
 const V={
-hawk(){const s=D.sites.wsmr_hawk;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>
+hawk(){const s=D.sites.wsmr_hawk;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>${totalCard('wsmr_hawk','10-day precipitation total')}
 <div class="card">${chart(s.days,[{n:'High',u:'°F',c:'#ef4444',v:d=>+d.hi||null,lab:1},{n:'Low',u:'°F',c:'#3b82f6',v:d=>+d.lo||null,lab:1}],{L:{t:'Temperature (°F)',tight:1}})}</div>
 <div class="card">${chart(s.days,[{n:'Max wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph},{n:'Max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1}],{L:{t:'Speed (mph)',min:0}})}</div>
-${s.days.map(d=>dayCard(d,1)).join('')}${hzCharts(s)}
+${s.days.map(d=>dayCard(d,1)).join('')}${amtChart(s.days)}${hzCharts(s)}
 <div class="card"><h3>Storm / weather notes</h3>${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p>Nothing notable in the next 10 days.</p>'}
 <details><summary>Pattern discussion (troughs, moisture, ensemble agreement)</summary><ul>${D.hawk_disc.join('')}</ul></details>
 <details><summary>NWS El Paso Area Forecast Discussion</summary><pre>${D.afd.replace(/</g,'&lt;')}</pre></details></div>`},
 pass(){const s=D.sites.san_augustin_pass,a=D.pass_alert,T=D.thresholds;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>
-<div class="status ${a.alert?'al':'ok'}"><b>${a.alert?'⚠️ ALERT':'✓ No alert'}</b>${a.alert?a.reasons.join('<br>'):'No high wind, low visibility, snow, freezing rain or sleet forecast in the next 10 days'}</div>
+${totalCard('san_augustin_pass','10-day precipitation total')}<div class="status ${a.alert?'al':'ok'}"><b>${a.alert?'⚠️ ALERT':'✓ No alert'}</b>${a.alert?a.reasons.join('<br>'):'No high wind, low visibility, snow, freezing rain or sleet forecast in the next 10 days'}</div>
 ${a.near.length?`<div class="card note"><h3>Near threshold</h3>${a.near.map(x=>`<div>${x}</div>`).join('')}</div>`:''}
 <div class="card"><h3>Gusts (mph)</h3>${chart(s.days,[{n:'Corrected max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1},{n:'Corrected max wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph}],{L:{t:'Speed (mph)',min:0},lines:[{y:T.gust_mph,c:'#dc2626',t:'Gust alert '+T.gust_mph+' mph'}]})}</div>
 <div class="card"><h3>Visibility</h3>${chart(s.days,[{n:'NBM chance vis < 1 mi',u:'%',c:'#a855f7',bar:1,v:d=>d.p_vis_lt1==null?null:d.p_vis_lt1*100}],{L:{t:'Chance vis < 1 mi (%)',min:0,max:100},lines:[{y:D.thresholds.p_vis*100,c:'#a855f7',t:'Vis alert '+D.thresholds.p_vis*100+'%'}]})+'<h3 style="margin-top:10px">HRRR minimum visibility, days 1–2</h3>'+chart(s.days.slice(0,2),[{n:'HRRR min visibility',u:'mi',c:'#10b981',bar:1,v:d=>d.vis_min_mi,dp:1}],{L:{t:'Visibility (mi)',min:0},lines:[{y:1,c:'#dc2626',t:'1 mi alert'}]})}
 <p class="muted">HRRR min visibility: day 1 ${f(s.days[0].vis_min_mi,1)} mi, day 2 ${f(s.days[1].vis_min_mi,1)} mi. Visibility/snow are raw model output (not locally verified). Thresholds: gust ≥${T.gust_mph} mph, wind ≥${T.wind_mph} mph, vis &lt;${T.vis_mi} mi, any snow.</p></div>
-${hzCharts(s)}${s.days.map(d=>dayCard(d,0)).join('')}`},
-cloud(){const s=D.sites.cloudcroft,w=s.days.filter(d=>D.weekend.includes(d.d));return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2><h3>This weekend</h3>
-<div class="wk">${w.map(d=>`<div class="card"><div class="muted">${d.dow} ${d.date.slice(5)}</div><div class="big">${icon(d)} ${pct(d.pop)}</div><div>Rain ${amt(d)}</div><div>Gusts ${f(d.gust_mph)} mph</div><div class="chips">${hzChips(d)}</div>${(d.snow_in||0)>=.1?`<div>Snow ${f(d.snow_in,1)}″</div>`:''}<details><summary>NWS</summary>${nwsTxt(d)}</details></div>`).join('')}</div>
-${ptypeChart(s,w)}${thunderChart(s,w)}<details class="card"><summary>All 10 days</summary>${s.days.map(d=>dayCard(d,0)).join('')}</details>`},
+${amtChart(s.days)}${hzCharts(s)}${s.days.map(d=>dayCard(d,0)).join('')}`},
+cloud(){const s=D.sites.cloudcroft,w=s.days.filter(d=>D.weekend.includes(d.d));return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>${totalCard('cloudcroft','Weekend (Fri–Sun) precipitation total')}<h3>This weekend</h3>
+<div class="wk">${w.map(d=>`<div class="card"><div class="muted">${d.dow} ${d.date.slice(5)}</div><div class="big">${icon(d)} ${pct(d.pop)}</div><div>Precip ${amt(d)}</div><div class="chips">${accChips(d)}</div><div>Gusts ${f(d.gust_mph)} mph</div><div class="chips">${hzChips(d)}</div><details><summary>NWS</summary>${nwsTxt(d)}</details></div>`).join('')}</div>
+${amtChart(w,'Weekend expected precipitation')}${ptypeChart(s,w)}${thunderChart(s,w)}<details class="card"><summary>All 10 days</summary>${s.days.map(d=>dayCard(d,0)).join('')}</details>`},
 about(){const t=(rows,cols,hd)=>`<table><tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`).join('')}</table>`;const S=D.skill;
  return `<h2>Model accuracy & about</h2><div class="card"><p>Forecasts are corrections of HRRR (days 1–2) and GEFS/ECMWF/NBM ensembles (days 1–10), trained on local station and gauge history (2023–2026) with terrain features. Lower error = better.</p>
 <p class="muted">Issued ${D.issued}. Guidance: HRRR ${D.guidance.hrrr||'n/a'}, NBM ${D.guidance.nbm}, GEFS ${D.guidance.gefs}, ECMWF ${D.guidance.ecmwf}.${D.notes.length?' Notes: '+D.notes.join('; '):''}</p></div>
