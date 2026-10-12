@@ -24,3 +24,5 @@ svg{max-height:220px;display:block;margin:auto}
 .ch .grid{stroke:var(--line);stroke-width:1}.ch .axis{stroke:var(--mut);stroke-width:1}.ch .at{font-size:10.5px;font-weight:600;fill:var(--fg)}.ch .pl{font-size:9px;fill:var(--fg)}
 .chip i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
 svg.ch{max-height:300px}
+.chip.hz{background:color-mix(in srgb,#eab308 30%,transparent);font-weight:600}
+.chip.spc{border:1px solid var(--line)}.spc1{background:#c1e9c1;color:#064}.spc2{background:#66a366;color:#fff}.spc3{background:#f6f67f;color:#552}.spc4{background:#e6c27a;color:#531}.spc5{background:#e67f7f;color:#fff}.spc6{background:#ff66ff;color:#fff}
