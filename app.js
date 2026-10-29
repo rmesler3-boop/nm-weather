@@ -85,6 +85,7 @@ seas(){const S=D.seasonal;if(!S)return '<p class="muted">Seasonal outlook not av
  const monsoonChart=m=>chart(['jul','aug','sep'].map(k=>({dow:k[0].toUpperCase()+k.slice(1),a:m[k][0]&&m[k][0].median,b:m[k][1]&&m[k][1].median})),[{n:'Normal (1991–2020 median)',u:'in',c:'#94a3b8',bar:1,v:d=>d.a,dp:2},{n:'Summers after strong El Niño (median)',u:'in',c:'#10b981',bar:1,v:d=>d.b,dp:2}],{L:{t:'Monthly rainfall (in)',min:0},xt:'Month'});
  return `<h2>Seasonal outlook</h2>
 <div class="card"><h3>🌊 ENSO & ocean state</h3><div class="big" style="font-size:22px">${E.forecast_class}</div><div class="muted">Latest ONI ${E.oni_latest} · PDO ${r2(E.pdo_latest)} (${E.pdo_latest<0?'negative':'positive'}) · IRI: ${E.iri}</div><details><summary>CPC ENSO discussion</summary><p style="font-size:13px">${E.cpc_discussion}</p></details></div>
+${pvCard()}
 <h3>❄️ Winter 2026–27 snow</h3>
 ${bestCard('Cloudcroft (village COOP, '+cc.record_years+')',cc,'″')}
 <div class="card"><h3>Cloudcroft: when the snow comes</h3>${monChart(cc,'in','Mean monthly snowfall (in)')}</div>
@@ -137,6 +138,38 @@ function organCells(k){const O=D.organ_cells;const tg={wsmr_hawk:'hawk',san_augu
 function nowcastCard(k){const N=D.nowcast;if(!N||!N.points||!N.points[k]){const oc=organCells(k);return oc?`<div class="sec">Next 4 hours</div><div class="card">${oc}</div>`:''};const p=N.points[k];const rt=N.radar_time?new Date(N.radar_time):null;
  if(!N.active||!(p.hours||[]).length){return `<div class="sec">Next 4 hours</div><div class="card"><div class="muted">📡 Radar ${N.radar_time?'as of '+hh(N.radar_time)+'. ':''}${p.echo_max60!=null?`Strongest echo within 60 km: ${Math.round(p.echo_max60)} dBZ.`:'No radar echoes within 60 km.'}${p.motion_kmh!=null&&p.echo_max60!=null?` Echoes moving ${Math.round(p.motion_kmh)} km/h.`:''} ${N.note?('Hourly rain chances: '+N.note):''}</div>${organCells(k)}</div>`}
  const mx=Math.max(.25,...p.hours.map(h=>h.pop));return `<div class="sec">Next 4 hours (radar nowcast)</div><div class="card"><div class="hours">${p.hours.map(h=>`<div class="hr"><div class="h">${hh(h.valid_utc)}</div><div class="i">${h.pop>=.5?'⛈️':h.pop>=.2?'🌦️':'☁️'}</div><div style="height:46px;display:flex;align-items:flex-end;justify-content:center"><div style="width:22px;height:${Math.max(2,Math.round(h.pop/mx*44))}px;background:#0284c7;border-radius:3px"></div></div><div class="p">${Math.round(h.pop*100)}%</div></div>`).join('')}</div><div class="muted">Chance of measurable rain (≥0.01″) in each hour (ending at the time shown), from live radar motion, the latest HRRR and terrain${p.echo_max15!=null?`; echo near here now ${Math.round(p.echo_max15)} dBZ`:''}${p.motion_kmh!=null?`, storms moving ${Math.round(p.motion_kmh)} km/h`:''}. Radar as of ${rt?hh(rt):'?'}. Tested for Jun–Sep only; beyond 4 h it adds no skill over the standard forecast.</div>${organCells(k)}</div>`}
+function pvCard(){const P=D.polar_vortex;if(!P)return `<div class="card"><h3>🌀 Polar vortex watch</h3><p class="muted">Stratosphere data unavailable right now.</p></div>`;
+ const md=s=>{if(!s)return'—';const d=new Date(s.slice(0,10)+'T12:00:00Z');return d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})};
+ const G=P.gefs,O=P.obs_latest,A=P.ao,H=P.history,st=P.status||'unavailable',fc=P.basis=='forecast';
+ const lab=st=='Disrupted'?(fc?'Disruption forecast':'Disrupted'):st=='Weakening'?(fc?'Weakening forecast':'Weakening'):st;
+ const col=st=='Disrupted'?'#7c3aed':st=='Weakening'?'#d97706':'#16a34a';
+ const src=k=>{const v=(P.sources||{})[k]||'unavailable';return v=='ok'?'':` <span class="muted">(${v})</span>`};
+ let now=O?`Stratospheric wind (10 hPa, 60°N) on ${md(O.date)}: <b>${O.u.toFixed(0)} m/s</b> westerly (normal for the date ${O.clim_mean!=null?O.clim_mean.toFixed(0):'—'} m/s).`:'Observed stratospheric wind unavailable.';
+ let fcs=G?`GEFS (${G.init}): <b>${G.n_reverse} of ${G.members}</b> members reverse to easterly (below 0)${G.first_reverse_median?`, median date ${md(G.first_reverse_median)}`:''}; ensemble mean bottoms at ${G.min_mean.toFixed(0)} m/s around ${md(G.min_mean_date)}.`:'GEFS forecast unavailable.';
+ const gm=P.gfs&&P.gfs.series?P.gfs.series.filter(x=>x[1]!=null):[];if(gm.length){const mn=gm.reduce((a,b)=>b[1]<a[1]?b:a);fcs+=` GFS (${P.gfs.init}) low: ${mn[1].toFixed(0)} m/s on ${md(mn[0])}.`}
+ const win=P.cold_window?`<div class="card note" style="margin:8px 0"><b>${fc?'Tentative window':'Window'} for elevated odds of cold spells: ${md(P.cold_window[0])} – ${md(P.cold_window[1])}</b> (about 2–6 weeks after the ${fc?'forecast':'observed'} reversal${fc?'; firms up once a reversal is actually observed':''}). Only if the disruption works its way down to the surface, which many don't.</div>`:'';
+ let ao='';if(A&&A.obs&&A.obs.length){const lo=A.obs[A.obs.length-1];ao=`Arctic Oscillation: ${lo[1]>=0?'+':''}${lo[1].toFixed(1)} on ${md(lo[0])}`;
+  if(A.gefs&&A.gefs.length){const mn=A.gefs.reduce((a,b)=>b[1]<a[1]?b:a);ao+=`; GEFS mean forecast reaches ${mn[1]>=0?'+':''}${mn[1].toFixed(1)} around ${md(mn[0])}`}
+  ao+='. A negative AO means cold Arctic air escapes south more easily.'+src('ao')}
+ let hist='';if(H&&H.stations){const c=H.stations.cloudcroft,a=H.stations.alamogordo,l=H.stations.las_cruces;
+  hist=`<b>Our check of past events:</b> in the ${H.window_days[0]}–${H.window_days[1]} days after ${c.n} major disruptions since 1958, very cold nights (coldest 10% for the date) were about as common as usual: Cloudcroft ${c.cold_rate}% of nights vs ${c.cold_base}% normally, Alamogordo ${a.cold_rate}% vs ${a.cold_base}% (n=${a.n}, record ends 2009), Las Cruces ${l.cold_rate}% vs ${l.cold_base}% (n=${l.n}). Cloudcroft 1″+ snow days: ${c.snow_rate}% vs ${c.snow_base}%. None of these differences are statistically clear. Past events were nearly all in Dec–Mar; none were this early (earliest on record ${md(H.earliest)}).`}
+ const ob=(P.obs||[]).slice(-30),cl=(P.clim_on_obs_dates||[]).slice(-30),rows=ob.map((x,i)=>({dow:'',dt:x[0],o:x[1],c:cl[i]}));
+ if(G)G.dates.forEach((d,i)=>{if(i==0&&rows.length&&rows[rows.length-1].dt==d){Object.assign(rows[rows.length-1],{m:G.mean[0],lo:G.p10[0],hi:G.p90[0]});return}rows.push({dow:'',dt:d,m:G.mean[i],lo:G.p10[i],hi:G.p90[i],c:(P.clim_on_gefs_dates||[])[i]})});
+ rows.forEach((r,i)=>{r.dow=(i%7==0)?md(r.dt):''});
+ const ch=rows.length?chart(rows,[{n:'Observed (GFS analysis)',u:'m/s',c:'#0f172a',v:d=>d.o,dp:1},{n:'GEFS mean',u:'m/s',c:'#7c3aed',v:d=>d.m,dp:1},{n:'GEFS 10th pct',u:'m/s',c:'#a78bfa',dash:1,v:d=>d.lo,dp:1},{n:'GEFS 90th pct',u:'m/s',c:'#c4b5fd',dash:1,v:d=>d.hi,dp:1},{n:'Normal (1991–2020)',u:'m/s',c:'#94a3b8',dash:1,v:d=>d.c,dp:1}],{L:{t:'Zonal wind 10 hPa, 60°N (m/s)'},lines:[{y:0,c:'#ef4444',t:'reversal (0)'}],xt:'Last 30 days observed → 16-day forecast'}):'';
+ return `<div class="card"><h3>🌀 Polar vortex watch <span class="muted" style="font-size:12px;font-weight:400">updated ${P.updated||'?'} · heads-up, not a calibrated forecast</span></h3>
+<div class="big" style="font-size:22px;color:${col}">${lab}</div>
+<div class="muted" style="margin:4px 0">${now}${src('obs')}<br>${fcs}${src('gefs')}</div>
+${win}
+<div style="font-size:14px"><b>What it could mean here:</b><ul style="margin:4px 0 0 18px;padding:0">
+<li>If the disruption reaches the surface, colder spells become more likely, with occasional snow at Cloudcroft and San Augustin Pass.</li>
+<li>Arctic air tends to reach the east side of the Sacramentos and the Tularosa Basin more easily than the Rio Grande valley.</li>
+<li>It wouldn't flip the winter: the very strong El Niño and the stratospheric wind pattern this year (westerly QBO) still favor a mild winter overall.</li>
+<li>Some disruptions never reach the surface at all, and the 10-day forecast will show a real cold outbreak once it's about a week out.</li></ul></div>
+${ao?`<div class="muted" style="margin-top:6px">${ao}</div>`:''}
+${ch?`<div style="margin-top:8px">${ch}</div>`:''}
+${hist?`<div class="muted" style="margin-top:6px">${hist}</div>`:''}
+<div class="muted" style="margin-top:6px;font-size:12px">Status: Normal; Weakening (observed wind in the weakest quarter for the date, or 20%+ of GEFS members reversing); Disrupted (reversal observed in the last 6 weeks, or forecast by at least half of GEFS members). Sources: NOAA GFS/GEFS (AWS open data), NCEP/NCAR Reanalysis-1 normals, NOAA CPC Arctic Oscillation, NOAA GHCN-Daily. Refreshed about every 8 hours.</div></div>`}
 function cpcCard(){const C=D.cpc_outlook;if(!C||!C.leads||!C.leads.length)return'';const pts=[['wsmr_hawk','Hawk St'],['san_augustin_pass','Pass'],['cloudcroft','Cloudcroft']];
  const seas=C.leads.filter(L=>/^[A-Z]{3}\b/.test(L.season||'')).slice(0,9),mon=C.leads.filter(L=>!/^[A-Z]{3}\b/.test(L.season||''))[0];
  const cell=r=>!r||r.cat=='EC'||r.prob<=33.5?'<span class="muted">equal chances</span>':`<b style="color:${(r.cat=='Above')==(r._v=='prcp')?'#0369a1':'#b45309'}">${r.cat=='Above'?'Above':'Below'} ${Math.round(r.prob)}%</b>`;
