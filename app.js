@@ -2,211 +2,288 @@ const $=s=>document.querySelector(s);let D;
 const th=localStorage.theme;if(th)document.documentElement.dataset.theme=th;
 document.getElementById('theme').onclick=()=>{const c=document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');const n=c=='dark'?'light':'dark';document.documentElement.dataset.theme=n;localStorage.theme=n};
 const f=(v,d=0)=>v==null?'—':(+v).toFixed(d), pct=v=>v==null?'—':Math.round(v*100)+'%', rg=(r,d=0)=>r&&r[0]!=null?f(r[0],d)+'–'+f(r[1],d):'—';
-function icon(d){const s=(d.sky||'').toLowerCase();if((d.snow_in||0)>=0.5)return'🌨️';if(d.pop>=.5)return'🌧️';if(d.pop>=.25)return'🌦️';if(d.gust_mph>=35)return'💨';
- if(s.includes('cloudy')&&!s.includes('partly')&&!s.includes('mostly sunny'))return'☁️';if(s.includes('partly'))return'⛅';if(s.includes('mostly'))return'🌤️';return'☀️'}
-function nice(lo,hi,n=5){if(hi<=lo)hi=lo+1;const r=(hi-lo)/n,p=Math.pow(10,Math.floor(Math.log10(r))),st=[1,2,2.5,5,10].map(m=>m*p).find(m=>m>=r);return{lo:Math.floor(lo/st)*st,hi:Math.ceil(hi/st)*st,st}}
-// series: {n,u,c,v,bar,ax:'L'|'R',dp}; o: {L:{t,min,max},R:{t,min,max},lines:[{y,ax,c,t}],xt}
-function chart(days,series,o={}){const W=360,H=200,l=44,r=o.R?50:12,t=12,b=40,n=days.length,pw=W-l-r,ph=H-t-b,xs=i=>l+(i+.5)*pw/n;
- const sc={};['L','R'].forEach(k=>{if(!o[k])return;const vals=series.filter(s=>(s.ax||'L')==k).flatMap(s=>days.map(s.v)).filter(x=>x!=null).concat((o.lines||[]).filter(x=>(x.ax||'L')==k).map(x=>x.y));
-  let lo=o[k].min??Math.min(...vals),hi=o[k].max??Math.max(...vals);if(o[k].min==null&&lo>0&&!o[k].tight)lo=0;const N=nice(lo,hi);sc[k]={...N,y:v=>t+ph-(v-N.lo)/(N.hi-N.lo)*ph}});
- let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" class="ch">`;const L=sc.L;
- for(let v=L.lo;v<=L.hi+1e-9;v+=L.st){g+=`<line x1="${l}" x2="${W-r}" y1="${L.y(v)}" y2="${L.y(v)}" class="grid"/><text x="${l-5}" y="${L.y(v)+3}" text-anchor="end">${+v.toFixed(2)}</text>`}
- if(sc.R){const R=sc.R;for(let v=R.lo;v<=R.hi+1e-9;v+=R.st)g+=`<text x="${W-r+5}" y="${R.y(v)+3}">${+v.toFixed(2)}</text>`}
- g+=`<line x1="${l}" x2="${l}" y1="${t}" y2="${t+ph}" class="axis"/><line x1="${l}" x2="${W-r}" y1="${t+ph}" y2="${t+ph}" class="axis"/>`;
- if(sc.R)g+=`<line x1="${W-r}" x2="${W-r}" y1="${t}" y2="${t+ph}" class="axis"/>`;
- g+=`<text class="at" transform="translate(11 ${t+ph/2}) rotate(-90)" text-anchor="middle">${o.L.t}</text>`;
- if(sc.R)g+=`<text class="at" transform="translate(${W-8} ${t+ph/2}) rotate(90)" text-anchor="middle">${o.R.t}</text>`;
- const nb=series.filter(s=>s.bar).length;let bi=0;
- series.forEach(s=>{const S=sc[s.ax||'L'],dp=s.dp??0;
-  if(s.bar){const bw=Math.min(16,pw/n*.6/nb),off=(bi++-(nb-1)/2)*bw;days.forEach((d,i)=>{const v=s.v(d);if(v!=null){const y0=S.y(Math.max(0,S.lo));g+=`<rect x="${xs(i)-bw/2+off}" y="${Math.min(S.y(v),y0)}" width="${bw-1}" height="${Math.abs(y0-S.y(v))}" rx="2" fill="${s.c}" opacity=".75"><title>${d.dow}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></rect>`}})}
-  else{const p=days.map((d,i)=>s.v(d)==null?null:`${xs(i)},${S.y(s.v(d))}`).filter(Boolean);g+=`<polyline fill="none" stroke="${s.c}" stroke-width="${s.dash?1.4:2.2}" ${s.dash?'stroke-dasharray="4 3" opacity=".85"':''} points="${p.join(' ')}"/>`;
-   days.forEach((d,i)=>{const v=s.v(d);if(v!=null&&!s.dash)g+=`<circle cx="${xs(i)}" cy="${S.y(v)}" r="3.2" fill="${s.c}"><title>${d.dow}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></circle>`+(s.lab?`<text x="${xs(i)}" y="${S.y(v)-6}" text-anchor="middle" class="pl">${(+v).toFixed(dp)}</text>`:'')})}});
- (o.lines||[]).forEach(x=>{const S=sc[x.ax||'L'];g+=`<line x1="${l}" x2="${W-r}" y1="${S.y(x.y)}" y2="${S.y(x.y)}" stroke="${x.c}" stroke-width="1.5" stroke-dasharray="5 3"/><text x="${W-r-3}" y="${S.y(x.y)-4}" text-anchor="end" style="fill:${x.c}">${x.t}</text>`});
- days.forEach((d,i)=>g+=`<text x="${xs(i)}" y="${t+ph+14}" text-anchor="middle">${d.dow}</text>`);
- g+=`<text class="at" x="${l+pw/2}" y="${H-4}" text-anchor="middle">${o.xt||'Day (6am–6am MT)'}</text></svg>`;
- return g+`<div class="chips">${series.map(s=>`<span class="chip"><i style="background:${s.c}"></i>${s.n} (${s.u})${s.ax=='R'?' →':o.R?' ←':''}</span>`).join('')}${(o.lines||[]).map(x=>`<span class="chip"><i style="background:${x.c};height:2px"></i>${x.t}</span>`).join('')}</div>`}
-const nwsTxt=d=>d.nws.length?d.nws.map(p=>`<div><b>${p.name}</b>: ${p.short} · ${p.temp}°F · PoP ${p.pop}% · ${p.wind}</div>`).join(''):'<div class="muted">No NWS period</div>';
-const LEG='Rain % = chance of measurable rain (≥0.01″). “If it rains” = middle half (25th–75th pct) of the amount when rain does fall; “could reach” = 90th pct given rain.';
-const crng=a=>a&&a.c25_in!=null?`if it rains, likely ${f(a.c25_in,2)}–${f(a.c75_in,2)}″, could reach ${f(a.c90_in,2)}″`:'';
-const amt=d=>{const a=d.amt||{};return `<span title="${LEG}">${crng(a)} (expected ${f(a.mean_in,2)}″)</span>`};
-const accChips=d=>{const a=d.amt||{};return ((a.snow_in||0)>=0.05?`<span class="chip">❄️ snow ${f(a.snow_in,1)}″</span>`:'')+((a.ice_in||0)>=0.005?`<span class="chip">🧊 ice ${f(a.ice_in,2)}″</span>`:'')};
-function stormCards(key,days){let S=(D.storms[key]||[]);if(days)S=S.filter(x=>x.days.some(d=>days.includes(d)));
- if(!S.length)return `<div class="card"><h3>🌦️ Storms</h3><p class="none">No storm events expected${days?' this weekend':' in the next 10 days'}.</p></div>`;
- return `<h3>🌧️ Storm events</h3><div class="wk">${S.map(x=>`<div class="card storm"><div style="font-weight:700">${x.name}</div><div class="muted">${x.start} → ${x.end}</div><div class="big">${f(x.mean_in,2)}″</div><div class="muted">expected liquid · <span title="${LEG}">${crng(x)}</span> · peak daily chance ${x.peak_pop}%</div><div class="chips">${x.snow_in>=0.05?`<span class="chip">❄️ snow ${f(x.snow_in,1)}″</span>`:''}${x.ice_in>=0.01?`<span class="chip">🧊 ice ${f(x.ice_in,2)}″</span>`:''}</div></div>`).join('')}</div>`}
-function totalCard(key,title){const t=D.totals[key];return `<div class="card total"><div class="muted">${title}</div><div class="big">💧 ${f(t.mean_in,2)}″ <span class="muted" style="font-size:14px">expected liquid</span></div><div class="muted"><span title="${LEG}">${crng(t)}</span>${t.snow_in>=0.05?` · ❄️ snow ${f(t.snow_in,1)}″`:''}${(t.ice_in||0)>=0.005?` · 🧊 ice ${f(t.ice_in,2)}″`:''}</div></div>`}
-function amtChart(ds,title){return `<div class="card"><h3>${title||'Expected precipitation'}</h3>`+chart(ds,[{n:'Expected liquid (mean)',u:'in',c:'#0284c7',bar:1,v:d=>d.amt&&d.amt.mean_in,dp:2},{n:'If it rains: 25th pct',u:'in',c:'#93c5fd',v:d=>d.amt&&d.amt.c25_in,dp:2},{n:'If it rains: 75th pct',u:'in',c:'#1d4ed8',v:d=>d.amt&&d.amt.c75_in,dp:2},{n:'If it rains: 90th pct',u:'in',c:'#64748b',v:d=>d.amt&&d.amt.c90_in,dp:2}].concat(ds.some(d=>d.amt&&d.amt.snow_in>=0.05)?[{n:'Snow',u:'in',c:'#a5b4fc',bar:1,v:d=>d.amt&&d.amt.snow_in,dp:1}]:[]),{L:{t:'Amount (in)',min:0}})+`<p class="muted">Expected = recalibrated mean (chance × typical wet-day amount). ${LEG}</p></div>`}
-function dayCard(d,temps){return `<div class="card day" onclick="this.classList.toggle('open')"><div><div class="dow">${d.d==1?'Today':d.dow}</div><div class="muted">${d.date.slice(5)}</div></div>
-<div class="ic">${icon(d)}</div><div>${d.sky?`<div>${d.sky}</div>`:''}<div class="chips"><span class="chip r">💧 ${pct(d.pop)} · ${amt(d)}</span>${accChips(d)}<span class="chip w">💨 ${f(d.wind_mph)} g${f(d.gust_mph)} mph</span>${hzChips(d)}</div></div>
-<div class="temps">${temps?`${d.hi}°<br><span>${d.lo}°</span>`:''}</div>
-<div class="more"><div class="muted">${d.label} · basis: ${d.basis}-corrected · NBM PoP ${pct(d.nbm_pop)}, QPF ${f(d.nbm_qpf_in,2)}″</div>${hzDetail(d)}<h3>NWS forecast</h3>${nwsTxt(d)}</div></div>`}
-const HZI={'thunder':'⚡ Thunder','hail':'🧊 Hail','freezing rain':'🧊 Freezing rain','sleet':'🌨️ Sleet'};
-function spcBadge(d){const p=d.hz&&d.hz.spc;if(!p)return'';const lv={none:0,TSTM:1,MRGL:2,SLGT:3,ENH:4,MDT:5,HIGH:6}[p.cat]??0;return `<span class="chip spc spc${lv}" title="SPC Day ${d.d} convective outlook">SPC D${d.d}: ${p.cat_name}${p.hail?` · hail ${Math.round(p.hail*100)}%`:''}${p.wind?` · wind ${Math.round(p.wind*100)}%`:''}${p.prob?` · severe ${Math.round(p.prob*100)}%`:''}</span>`}
-function hzChips(d){const h=d.hz||{};return (h.flags||[]).map(x=>`<span class="chip hz">${HZI[x]||x}</span>`).join('')+((h.nbm_tstm||0)>=10&&!(h.flags||[]).includes('thunder')?`<span class="chip">⚡ ${f(h.nbm_tstm)}%</span>`:'')+spcBadge(d)}
-function hzDetail(d){const h=d.hz||{};return `<div class="muted">Hazards — NBM 12-h thunder ${f(h.nbm_tstm)}% · P(freezing rain, inst.) ${f(h.nbm_pt_frzr)}% · P(sleet, inst.) ${f(h.nbm_pt_sleet)}% · P(ice > 0.01″) ${f(h.nbm_p_ice)}%${h.hrrr_cape!=null?` · HRRR max CAPE ${f(h.hrrr_cape)} J/kg, max reflectivity ${f(h.hrrr_refc)} dBZ, lightning ${h.hrrr_ltng>0?'yes':'none'}, max hail ${f(h.hrrr_hail_in,2)}″, freezing-rain hrs ${f(h.hrrr_frzr_hrs)}, sleet hrs ${f(h.hrrr_sleet_hrs)}`:''}</div>`}
-function ptypeChart(s,ds){ds=ds||s.days;const T=[['rain','Rain','#0ea5e9'],['snow','Snow','#a5b4fc'],['frzr','Freezing rain (ice)','#ec4899'],['sleet','Sleet','#8b5cf6']];
- const act=T.filter(([k])=>ds.some(d=>d.hz&&d.hz.ptype_abs&&d.hz.ptype_abs[k]>0));
- let g=`<div class="card"><h3>Precipitation chance by type</h3>`;
- if(!act.length)return g+`<p class="none">No precipitation expected in this period.</p></div>`;
- return g+chart(ds,act.map(([k,n,c],i)=>({n,u:'%',c,v:d=>d.hz&&d.hz.ptype_abs?d.hz.ptype_abs[k]:null,bar:k=='rain'||act.length==1,lab:act.length<=2})),{L:{t:'Daily chance (%)',min:0,max:100}})
- +`<p class="muted">Daily chance of each type = corrected chance of measurable precip × NBM share of that type during the day (NBM instantaneous precip-type probabilities). Only types with a nonzero chance are shown.</p></div>`}
-function thunderChart(s,ds){const wk=!!ds;ds=ds||s.days;let g=`<div class="card"><h3>Thunderstorms</h3>`+chart(ds,[{n:'NBM thunder chance (12-h max)',u:'%',c:'#eab308',bar:1,v:d=>d.hz&&d.hz.nbm_tstm}],{L:{t:'Thunder chance (%)',min:0,max:100},lines:[{y:25,c:'#eab308',t:'thunder flag 25%'}]});
- const h2=wk?[]:s.days.filter(d=>d.hz&&d.hz.hrrr_cape!=null);if(h2.length)g+=`<h3 style="margin-top:10px">HRRR convective ingredients (within ~10 km), days 1–2</h3>`+chart(h2,[{n:'Max reflectivity',u:'dBZ',c:'#10b981',bar:1,v:d=>Math.max(0,d.hz.hrrr_refc)},{n:'Max CAPE',u:'J/kg',c:'#f97316',v:d=>d.hz.hrrr_cape,ax:'R'}],{L:{t:'Reflectivity (dBZ)',min:0,max:70},R:{t:'CAPE (J/kg)',min:0},lines:[{y:40,c:'#10b981',t:'40 dBZ ≈ storm'}]});
- return g+`<p class="muted">SPC outlooks (days 1–3) shown as badges on the day cards.</p></div>`}
-function hzCharts(s){return ptypeChart(s)+thunderChart(s)}
-const V={
-hawk(){const s=D.sites.wsmr_hawk;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>${stormCards('wsmr_hawk')}${totalCard('wsmr_hawk','10-day precipitation total')}
-<div class="card">${chart(s.days,[{n:'High',u:'°F',c:'#ef4444',v:d=>+d.hi||null,lab:1},{n:'Low',u:'°F',c:'#3b82f6',v:d=>+d.lo||null,lab:1},{n:'High 10th pct',u:'°F',c:'#fca5a5',dash:1,v:d=>d.hi_rng?d.hi_rng[0]:null},{n:'High 90th pct',u:'°F',c:'#fca5a5',dash:1,v:d=>d.hi_rng?d.hi_rng[1]:null},{n:'Low 10th pct',u:'°F',c:'#93c5fd',dash:1,v:d=>d.lo_rng?d.lo_rng[0]:null},{n:'Low 90th pct',u:'°F',c:'#93c5fd',dash:1,v:d=>d.lo_rng?d.lo_rng[1]:null}],{L:{t:'Temperature (°F)',tight:1}})}</div>
-<div class="card">${chart(s.days,[{n:'Max wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph},{n:'Max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1},{n:'Gust 10th pct',u:'mph',c:'#fcd34d',dash:1,v:d=>d.gust_rng?d.gust_rng[0]:null},{n:'Gust 90th pct',u:'mph',c:'#fcd34d',dash:1,v:d=>d.gust_rng?d.gust_rng[1]:null}],{L:{t:'Speed (mph)',min:0}})}</div>
-${s.days.map(d=>dayCard(d,1)).join('')}${amtChart(s.days)}${hzCharts(s)}
-<div class="card"><h3>Storm / weather notes</h3>${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p>Nothing notable in the next 10 days.</p>'}
-<details><summary>Pattern discussion (troughs, moisture, ensemble agreement)</summary><ul>${D.hawk_disc.join('')}</ul></details>
-<details><summary>NWS El Paso Area Forecast Discussion</summary><pre>${D.afd.replace(/</g,'&lt;')}</pre></details></div>`},
-pass(){const s=D.sites.san_augustin_pass,a=D.pass_alert,T=D.thresholds;return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>
-<div class="status ${a.alert?'al':'ok'}"><b>${a.alert?'⚠️ ALERT':'✓ No alert'}</b>${a.alert?a.reasons.join('<br>'):'No high wind, low visibility, snow, freezing rain or sleet forecast in the next 10 days'}</div>${stormCards('san_augustin_pass')}${totalCard('san_augustin_pass','10-day precipitation total')}
-${a.near.length?`<div class="card note"><h3>Near threshold</h3>${a.near.map(x=>`<div>${x}</div>`).join('')}</div>`:''}
-<div class="card"><h3>Gusts (mph)</h3>${chart(s.days,[{n:'Corrected max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1},{n:'Corrected max wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph}],{L:{t:'Speed (mph)',min:0},lines:[{y:T.gust_mph,c:'#dc2626',t:'Gust alert '+T.gust_mph+' mph'}]})}</div>
-<div class="card"><h3>Visibility</h3>${chart(s.days,[{n:'NBM chance vis < 1 mi',u:'%',c:'#a855f7',bar:1,v:d=>d.p_vis_lt1==null?null:d.p_vis_lt1*100}],{L:{t:'Chance vis < 1 mi (%)',min:0,max:100},lines:[{y:D.thresholds.p_vis*100,c:'#a855f7',t:'Vis alert '+D.thresholds.p_vis*100+'%'}]})+'<h3 style="margin-top:10px">HRRR minimum visibility, days 1–2</h3>'+chart(s.days.slice(0,2),[{n:'HRRR min visibility',u:'mi',c:'#10b981',bar:1,v:d=>d.vis_min_mi,dp:1}],{L:{t:'Visibility (mi)',min:0},lines:[{y:1,c:'#dc2626',t:'1 mi alert'}]})}
-<p class="muted">HRRR min visibility: day 1 ${f(s.days[0].vis_min_mi,1)} mi, day 2 ${f(s.days[1].vis_min_mi,1)} mi. Visibility/snow are raw model output (not locally verified). Thresholds: gust ≥${T.gust_mph} mph, wind ≥${T.wind_mph} mph, vis &lt;${T.vis_mi} mi, any snow.</p></div>
-${amtChart(s.days)}${hzCharts(s)}${s.days.map(d=>dayCard(d,0)).join('')}`},
-cloud(){const s=D.sites.cloudcroft,w=s.days.filter(d=>D.weekend.includes(d.d));return `<h2>${s.name} <span class="muted">${s.elev_ft} ft</span></h2>${stormCards('cloudcroft',D.weekend)}${totalCard('cloudcroft','Weekend (Fri–Sun) precipitation total')}<h3>This weekend</h3>
-<div class="wk">${w.map(d=>`<div class="card"><div class="muted">${d.dow} ${d.date.slice(5)}</div><div class="big">${icon(d)} ${pct(d.pop)}</div><div>Precip ${amt(d)}</div><div class="chips">${accChips(d)}</div><div>Gusts ${f(d.gust_mph)} mph</div><div class="chips">${hzChips(d)}</div><details><summary>NWS</summary>${nwsTxt(d)}</details></div>`).join('')}</div>
-${amtChart(w,'Weekend expected precipitation')}${ptypeChart(s,w)}${thunderChart(s,w)}<details class="card"><summary>All 10 days</summary>${s.days.map(d=>dayCard(d,0)).join('')}</details>`},
-seas(){const S=D.seasonal;if(!S)return '<p class="muted">Seasonal outlook not available.</p>';const W=S.winter,M=S.monsoon,E=S.enso;
- const r1=x=>x==null?'—':(+x).toFixed(1), r2=x=>x==null?'—':(+x).toFixed(2), doy=n=>{if(n==null)return'—';const d=new Date(Date.UTC(2027,0,1));d.setUTCDate(n);return d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})};
- const cc=W.cloudcroft,hk=W.wsmr_hawk,mp=W.cloudcroft_mp;
- const bestCard=(t,w,u)=>`<div class="card"><div class="muted">${t}</div><div class="big">${r1(w.best_snow.central)}${u}</div><div class="muted">expected season snowfall (likely ${r1(w.best_snow.lo)}–${r1(w.best_snow.hi)}${u}) · normal ${r1(w.normal&&w.normal.median)}${u} (1991–2020 median, n=${w.normal?w.normal.n:0})</div><div class="muted">Strong El Niño winters: median ${r1(w.strong_nino&&w.strong_nino.median)}${u}, n=${w.strong_nino?w.strong_nino.n:0} · ${w.strong_above_median_rate!=null?Math.round(w.strong_above_median_rate*100)+'% beat the all-years median':''}</div></div>`;
- const monChart=(w,u,t)=>chart(w.months.map((m,i)=>({dow:m,a:w.mon_normal[i],b:w.mon_strong[i]})),[{n:'Normal (1991–2020 mean)',u,c:'#94a3b8',bar:1,v:d=>d.a,dp:1},{n:'Strong El Niño winters (mean)',u,c:'#0ea5e9',bar:1,v:d=>d.b,dp:1}],{L:{t:t,min:0},xt:'Month'});
- const yrs=w=>chart(w.strong_years.map(([y,v])=>({dow:String(y).slice(0,4),v})),[{n:'Season snowfall',u:'in',c:'#0ea5e9',bar:1,v:d=>d.v,dp:0}],{L:{t:'Snowfall (in)',min:0},lines:[{y:w.normal.median,c:'#64748b',t:'normal '+r1(w.normal.median)+' in'}],xt:'Strong El Niño winter (start year)'});
- const cpcRows=(site,v)=>S.cpc.filter(r=>r.site==site&&r.var==v&&r.lead<=8);
- const cpcChart=site=>{const p=cpcRows(site,'prcp'),t=cpcRows(site,'temp');return chart(p.map((r,i)=>({dow:r.season.split(' ')[0],p:(r.cat=='Above'?1:r.cat=='Below'?-1:0)*(r.cat=='EC'?0:r.prob),t:t[i]?(t[i].cat=='Above'?1:t[i].cat=='Below'?-1:0)*(t[i].cat=='EC'?0:t[i].prob):null})),[{n:'Precip (+above / −below)',u:'% prob',c:'#0ea5e9',bar:1,v:d=>d.p},{n:'Temperature (+above / −below)',u:'% prob',c:'#ef4444',bar:1,v:d=>d.t}],{L:{t:'Tilt probability (%)',min:-70,max:70},lines:[{y:0,c:'#64748b',t:'EC (equal chances)'}],xt:'3-month season (CPC, issued '+(p[0]?p[0].issued:'')+')'})};
- const nm=(site,v)=>S.nmme.filter(r=>r.site==site&&r.var==v);
- const nmChart=site=>{const p=nm(site,'prate');return chart(p.map(r=>({dow:r.month.slice(2).replace('-','/'),...r})),[{n:'P(above-normal precip)',u:'%',c:'#0ea5e9',v:d=>d.above*100},{n:'P(below-normal precip)',u:'%',c:'#f59e0b',v:d=>d.below*100}],{L:{t:'Probability (%)',min:0,max:100},lines:[{y:33.3,c:'#64748b',t:'climatology 33%'}],xt:'Month (YY/MM), NMME init '+(p[0]?p[0].init:'')})};
- const mm=M.wsmr_hawk,mc=M.cloudcroft;
- const monsoonChart=m=>chart(['jul','aug','sep'].map(k=>({dow:k[0].toUpperCase()+k.slice(1),a:m[k][0]&&m[k][0].median,b:m[k][1]&&m[k][1].median})),[{n:'Normal (1991–2020 median)',u:'in',c:'#94a3b8',bar:1,v:d=>d.a,dp:2},{n:'Summers after strong El Niño (median)',u:'in',c:'#10b981',bar:1,v:d=>d.b,dp:2}],{L:{t:'Monthly rainfall (in)',min:0},xt:'Month'});
- return `<h2>Seasonal outlook</h2>
-<div class="card"><h3>🌊 ENSO & ocean state</h3><div class="big" style="font-size:22px">${E.forecast_class}</div><div class="muted">Latest ONI ${E.oni_latest} · PDO ${r2(E.pdo_latest)} (${E.pdo_latest<0?'negative':'positive'}) · IRI: ${E.iri}</div><details><summary>CPC ENSO discussion</summary><p style="font-size:13px">${E.cpc_discussion}</p></details></div>
-${pvCard()}
-<h3>❄️ Winter 2026–27 snow</h3>
-${bestCard('Cloudcroft (village COOP, '+cc.record_years+')',cc,'″')}
-<div class="card"><h3>Cloudcroft: when the snow comes</h3>${monChart(cc,'in','Mean monthly snowfall (in)')}</div>
-<div class="card"><h3>Cloudcroft: every strong El Niño winter on record</h3>${yrs(cc)}<p class="muted">2023–24 (strong El Niño with negative PDO, like now) came in below normal — the closest analog is a warning that a big El Niño does not guarantee big snow.</p></div>
-${S.snotel?`<div class="card"><h3>Sierra Blanca SNOTEL peak snow-water equivalent</h3><p>Normal (2002–2025) median ${r1(S.snotel.normal.median)}″ SWE (10–90%: ${r1(S.snotel.normal.p10)}–${r1(S.snotel.normal.p90)}″). Strong El Niño winters: ${S.snotel.strong?r1(S.snotel.strong.median)+'″ (n='+S.snotel.strong.n+')':'—'}. Record too short for a reliable ENSO split.</p></div>`:''}
-${bestCard('Hawk St area (Las Cruces State Univ proxy, '+hk.record_years+')',hk,'″')}
-<div class="card"><h3>Hawk St area winter precipitation (Nov–Mar)</h3><p>Normal ${r2(hk.prcp_normal&&hk.prcp_normal.median)}″ · strong El Niño winters ${r2(hk.prcp_strong&&hk.prcp_strong.median)}″ (n=${hk.prcp_strong?hk.prcp_strong.n:0}) · best estimate ${r2(hk.best_prcp&&hk.best_prcp.central)}″ (${r2(hk.best_prcp&&hk.best_prcp.lo)}–${r2(hk.best_prcp&&hk.best_prcp.hi)}″)</p>${monChart(hk,'in','Mean monthly snowfall (in)')}</div>
-${cpcCard()||`<div class="card"><h3>NOAA CPC 3-month outlooks — Cloudcroft</h3>${cpcChart('cloudcroft')}<h3 style="margin-top:10px">Hawk St</h3>${cpcChart('wsmr_hawk')}</div>`}
-<div class="card"><h3>NMME monthly precipitation probabilities — Cloudcroft</h3>${nmChart('cloudcroft')}<h3 style="margin-top:10px">Hawk St</h3>${nmChart('wsmr_hawk')}<p class="muted">${S.c3s}</p></div>
-<h3>🌩️ Monsoon 2027</h3>
-<div class="card note"><b>Very low skill this far out.</b> Summer-monsoon outlooks issued in October have little demonstrated skill; ENSO's link to the following monsoon is weak (correlation of prior-winter ONI with Jun 15–Sep 30 rain: ${r2(mm.corr_prior_oni_total)} at Las Cruces). Treat this as climatology with a slight tilt.</div>
-<div class="card"><div class="muted">Hawk St area (Las Cruces proxy) — Jun 15–Sep 30 rain</div><div class="big">${r2(mm.total_best&&mm.total_best.central)}″</div><div class="muted">likely ${r2(mm.total_best&&mm.total_best.lo)}–${r2(mm.total_best&&mm.total_best.hi)}″ · normal ${r2(mm.total[0]&&mm.total[0].median)}″ · typical onset ${doy(mm.onset[0]&&mm.onset[0].median)} (after strong El Niño: ${doy(mm.onset[1]&&mm.onset[1].median)}, n=${mm.onset[1]?mm.onset[1].n:0})</div>${monsoonChart(mm)}</div>
-<div class="card"><div class="muted">Cloudcroft — Jun 15–Sep 30 rain</div><div class="big">${r2(mc.total_best&&mc.total_best.central)}″</div><div class="muted">likely ${r2(mc.total_best&&mc.total_best.lo)}–${r2(mc.total_best&&mc.total_best.hi)}″ · normal ${r2(mc.total[0]&&mc.total[0].median)}″</div>${monsoonChart(mc)}</div>
-<details class="card"><summary>Method & skill notes</summary><ul>
-<li>Expected totals shrink the strong-El-Niño composite toward the 1991–2020 normal by n/(n+5) because only 5–8 strong events exist; ranges are the composite's 10th–90th percentiles.</li>
-<li>Correlation of winter ONI with season snowfall: Cloudcroft ${r2(cc.corr_oni_snow)}, Mountain Park ${r2(mp.corr_oni_snow)}, Las Cruces ${r2(hk.corr_oni_snow)}, Jornada ${r2(W.wsmr_hawk_j.corr_oni_snow)} — ENSO explains at most about a quarter of the year-to-year variance, less in the lowlands.</li>
-<li>No long record exists at WSMR main post; Las Cruces (State Univ, 1,185 m) and Jornada are lower and west/north of the Organs, so Hawk St likely gets somewhat more.</li>
-<li>Seasons with &gt;15% missing days are excluded (Cloudcroft has gaps). Monsoon onset = first date after Jun 15 with ≥0.5″ in 7 days (local heuristic).</li>
-<li>CPC outlook probabilities are for 3 categories (below/near/above normal); "EC" = equal chances.</li></ul></details>`},
-about(){const t=(rows,cols,hd)=>`<table><tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`).join('')}</table>`;const S=D.skill;
- return `<h2>Model accuracy & about</h2><div class="card"><p>Forecasts are corrections of HRRR (days 1–2) and GEFS/ECMWF/NBM ensembles (days 1–10), trained on local station and gauge history (2023–2026) with terrain features. Lower error = better.</p>
-<p class="muted">Issued ${D.issued}. Guidance: HRRR ${D.guidance.hrrr||'n/a'}, NBM ${D.guidance.nbm}, GEFS ${D.guidance.gefs}, ECMWF ${D.guidance.ecmwf}.${D.notes.length?' Notes: '+D.notes.join('; '):''}</p></div>
-<div class="card"><h3>Daily rain-chance accuracy by lead day</h3>${chart(S.lr_precip.filter(r=>/^\d+$/.test(String(r.key))).map(r=>({dow:'D'+r.key,...r})),[{n:'NBM',u:'Brier',c:'#94a3b8',v:r=>r.BS_nbm,dp:3},{n:'This model',u:'Brier',c:'#2563eb',v:r=>r.BS_model,dp:3},{n:'Climatology',u:'Brier',c:'#cbd5e1',v:r=>r.BS_clim,dp:3}],{L:{t:'Brier score (0–1, lower better)',min:0},xt:'Forecast lead day'})}</div>
-<div class="card"><h3>Daily max gust error by lead day (mph, lower better)</h3>${chart(S.lr_wind.filter(r=>r.var=='gmax'&&/^\d+$/.test(String(r.lead_day))).sort((a,b)=>a.lead_day-b.lead_day).map(r=>({dow:'D'+r.lead_day,...r})),[{n:'NBM (height+bias adj.)',u:'mph',c:'#94a3b8',v:r=>r.MAE_nbm_hadj_biascorr==null?null:r.MAE_nbm_hadj_biascorr*2.237,dp:1},{n:'This model',u:'mph',c:'#f59e0b',v:r=>r.MAE_model==null?null:r.MAE_model*2.237,dp:1}],{L:{t:'Mean abs. error (mph)',min:0},xt:'Forecast lead day'})}</div>
-<details class="card"><summary>Day 1 rain amount by station</summary>${t(S.day1_precip,['target','n','MAE_hrrr','MAE_median','cov_q90'],['Station','n','HRRR MAE mm','Model MAE mm','90% cover'])}</details>
-<div class="card"><h3>Thunder-day check: NBM vs GOES GLM lightning</h3>${S.thunder&&S.thunder.length?chart(S.thunder.map(r=>({dow:r.bin,...r})),[{n:'Observed thunder-day frequency',u:'%',c:'#eab308',bar:1,v:r=>r.obs_freq*100},{n:'Mean NBM forecast',u:'%',c:'#64748b',v:r=>r.fc_mean}],{L:{t:'Frequency (%)',min:0,max:100},xt:'NBM day-1 thunder chance bin (%)'})+t(S.thunder,['bin','n','fc_mean','obs_freq'],['NBM bin %','days','mean fcst %','obs freq']):'<p class="muted">Not available.</p>'}<p class="muted">Sampled GLM (1 file per 3 min, 17–06Z), flashes within 20 km, Sep 11–Oct 10 2026 only — a small, late-monsoon sample.</p></div>
-<details class="card"><summary>Hail reports near each point (SPC, 2000–2024, within 40 km)</summary>${t(S.hail||[],['site','report_days','ge_1in','max_in','report_days_2020_24'],['Point','report days','≥1″ reports','max (in)','days 2020–24'])}<p class="muted">Too few reports (about 1–2 days/yr, and biased toward roads/towns) to verify hail forecasts.</p></details>
-<div class="card"><h3>Uncertainty ranges (what the dashed lines mean)</h3><p>Dashed lines are the 10th and 90th percentiles (an 80% range): about 8 in 10 outcomes should land between them. Verified on held-out data (Jul 2025 onward):</p>${(D.uncertainty&&D.uncertainty.rows||[]).length?t(D.uncertainty.rows,['what','days','nominal','covered'],['Quantity','Lead','Nominal','Actually inside (test)']):''}<p class="muted">${(D.uncertainty&&D.uncertainty.notes||[]).join(' ')}</p></div>
-<details class="card"><summary>Caveats</summary><ul><li>No on-site wind record at Hawk St or the Pass; winds transfer from nearby stations.</li><li>Rain gauges undercatch snow; snow skill is weak.</li><li>Visibility, smoke and snow are raw model output.</li><li>Thunder, hail, freezing rain and sleet are raw NBM/HRRR/SPC guidance, not locally corrected; freezing rain/sleet and hail have almost no local verification data.</li></ul></details>`}};
 
-// ================= v2 layout =================
+/* ---- precip type palette (consistent app-wide; patterns help color-blind) ---- */
+const PTYPE={
+  rain:{n:'Rain',u:'%',c:'#0284c7',pat:'solid'},
+  snow:{n:'Snow',u:'%',c:'#6366f1',pat:'diag'},
+  frzr:{n:'Freezing rain / ice',u:'%',c:'#db2777',pat:'hatch'},
+  sleet:{n:'Sleet',u:'%',c:'#9333ea',pat:'dots'}
+};
+const LEG='Rain % = chance of measurable rain (≥0.01″). “If it rains, likely X–Y″” is the middle half of the amount when rain does fall; “could reach” is the high end (90th percentile) if it rains.';
+const crng=a=>a&&a.c25_in!=null?`if it rains, likely ${f(a.c25_in,2)}–${f(a.c75_in,2)}″, could reach ${f(a.c90_in,2)}″`:'';
+const amtShort=a=>a&&a.c25_in!=null?`${f(a.c25_in,2)}–${f(a.c75_in,2)}″`:'';
+const amt=d=>{const a=d.amt||{};return `<span title="${LEG}">${crng(a)}</span>`};
+const accChips=d=>{const a=d.amt||{};return ((a.snow_in||0)>=0.05?`<span class="chip s">❄️ snow ${f(a.snow_in,1)}″ (snow, not liquid)</span>`:'')+((a.ice_in||0)>=0.005?`<span class="chip i">🧊 ice ${f(a.ice_in,2)}″</span>`:'')};
+const HZI={'thunder':'⚡ Thunder','hail':'🧊 Hail','freezing rain':'🧊 Freezing rain','sleet':'🌨️ Sleet'};
+function icon(d){const s=(d.sky||'').toLowerCase();if((d.amt&&d.amt.snow_in||0)>=0.5)return'🌨️';if(d.pop>=.5)return'🌧️';if(d.pop>=.25)return'🌦️';if(d.gust_mph>=35)return'💨';
+ if(s.includes('cloudy')&&!s.includes('partly')&&!s.includes('mostly sunny'))return'☁️';if(s.includes('partly'))return'⛅';if(s.includes('mostly'))return'🌤️';return'☀️'}
 function wxIcon(short,day){const s=(short||'').toLowerCase();if(/thunder|t-storm/.test(s))return'⛈️';if(/snow|flurr/.test(s))return'🌨️';if(/sleet|freezing|ice/.test(s))return'🧊';if(/rain|shower|drizzle/.test(s))return day?'🌦️':'🌧️';
  if(/fog|haze|smoke|dust/.test(s))return'🌫️';if(/wind|breezy/.test(s)&&!/sunny|clear/.test(s))return'💨';if(/mostly cloudy|overcast|^cloudy/.test(s))return'☁️';if(/partly/.test(s))return day?'⛅':'☁️';if(/mostly sunny|mostly clear/.test(s))return day?'🌤️':'🌙';return day?'☀️':'🌙'}
 const hh=t=>new Date(t).toLocaleTimeString('en-US',{hour:'numeric',timeZone:'America/Denver'}).replace(':00','').replace(' ','').toLowerCase();
 const ago=t=>{if(!t)return'';const m=Math.round((Date.now()-new Date(t))/60000);return m<60?m+' min ago':Math.round(m/60)+' h ago'};
+const dayLab=d=>{const m=(d.date||'').slice(5);return (d.d==1?'Today':d.dow)+(m?' '+m.replace('-','/'):'')};
+function nice(lo,hi,n=5){if(hi<=lo)hi=lo+1;const r=(hi-lo)/n,p=Math.pow(10,Math.floor(Math.log10(r))),st=[1,2,2.5,5,10].map(m=>m*p).find(m=>m>=r)||1;return{lo:Math.floor(lo/st)*st,hi:Math.ceil(hi/st)*st,st}}
+
+function patDefs(){return `<defs>
+ <pattern id="pat-diag" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#6366f1"/><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="2.5"/></pattern>
+ <pattern id="pat-hatch" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#db2777"/><line x1="0" y1="3" x2="6" y2="3" stroke="#fff" stroke-width="2"/></pattern>
+ <pattern id="pat-dots" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#9333ea"/><circle cx="3" cy="3" r="1.3" fill="#fff"/></pattern>
+</defs>`}
+function fillFor(s){return s.pat=='diag'?'url(#pat-diag)':s.pat=='hatch'?'url(#pat-hatch)':s.pat=='dots'?'url(#pat-dots)':s.c}
+function chipPat(s){return s.pat=='diag'?'pat-snow':s.pat=='hatch'?'pat-frzr':s.pat=='dots'?'pat-sleet':''}
+
+/* series: {n,u,c,v,bar,ax,dp,pat,lab}; o: {title,sub,L:{t,min,max},R,lines,xt,xlab} */
+function chart(days,series,o={}){
+ const W=380,H=220,l=46,r=o.R?52:14,t=18,b=46,n=days.length,pw=W-l-r,ph=H-t-b,xs=i=>l+(i+.5)*pw/n;
+ const sc={};['L','R'].forEach(k=>{if(!o[k])return;const vals=series.filter(s=>(s.ax||'L')==k).flatMap(s=>days.map(s.v)).filter(x=>x!=null).concat((o.lines||[]).filter(x=>(x.ax||'L')==k).map(x=>x.y));
+  let lo=o[k].min??Math.min(...vals),hi=o[k].max??Math.max(...vals);if(!isFinite(lo)||!isFinite(hi)){lo=0;hi=1}if(o[k].min==null&&lo>0&&!o[k].tight)lo=0;if(hi<=lo)hi=lo+1;const N=nice(lo,hi);sc[k]={...N,y:v=>t+ph-(v-N.lo)/(N.hi-N.lo)*ph}});
+ let g=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" class="ch" aria-label="${(o.title||'').replace(/"/g,'')}">${patDefs()}`;
+ const L=sc.L;for(let v=L.lo;v<=L.hi+1e-9;v+=L.st){g+=`<line x1="${l}" x2="${W-r}" y1="${L.y(v)}" y2="${L.y(v)}" class="grid"/><text x="${l-5}" y="${L.y(v)+3}" text-anchor="end">${+v.toFixed(v>=10||Number.isInteger(L.st)?0:2)}</text>`}
+ if(sc.R){const R=sc.R;for(let v=R.lo;v<=R.hi+1e-9;v+=R.st)g+=`<text x="${W-r+5}" y="${R.y(v)+3}">${+v.toFixed(v>=10||Number.isInteger(R.st)?0:2)}</text>`}
+ g+=`<line x1="${l}" x2="${l}" y1="${t}" y2="${t+ph}" class="axis"/><line x1="${l}" x2="${W-r}" y1="${t+ph}" y2="${t+ph}" class="axis"/>`;
+ if(sc.R)g+=`<line x1="${W-r}" x2="${W-r}" y1="${t}" y2="${t+ph}" class="axis"/>`;
+ g+=`<text class="at" transform="translate(12 ${t+ph/2}) rotate(-90)" text-anchor="middle">${o.L.t}</text>`;
+ if(sc.R)g+=`<text class="at" transform="translate(${W-7} ${t+ph/2}) rotate(90)" text-anchor="middle">${o.R.t}</text>`;
+ const nb=series.filter(s=>s.bar).length;let bi=0;
+ series.forEach(s=>{const S=sc[s.ax||'L'],dp=s.dp??0,fl=fillFor(s);
+  if(s.bar){const bw=Math.min(18,pw/n*.62/Math.max(1,nb)),off=(bi++-(nb-1)/2)*bw;days.forEach((d,i)=>{const v=s.v(d);if(v!=null){const y0=S.y(Math.max(0,S.lo));g+=`<rect x="${xs(i)-bw/2+off}" y="${Math.min(S.y(v),y0)}" width="${Math.max(1,bw-1)}" height="${Math.abs(y0-S.y(v))}" rx="2" fill="${fl}" opacity=".9"><title>${dayLab(d)}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></rect>`}})}
+  else{const p=days.map((d,i)=>s.v(d)==null?null:`${xs(i)},${S.y(s.v(d))}`).filter(Boolean);g+=`<polyline fill="none" stroke="${s.c}" stroke-width="${s.dash?1.5:2.3}" ${s.dash?'stroke-dasharray="4 3" opacity=".85"':''} points="${p.join(' ')}"/>`;
+   days.forEach((d,i)=>{const v=s.v(d);if(v!=null&&!s.dash){const mk=s.marker||'circle';if(mk=='diamond')g+=`<rect x="${xs(i)-3.2}" y="${S.y(v)-3.2}" width="6.4" height="6.4" transform="rotate(45 ${xs(i)} ${S.y(v)})" fill="${s.c}"><title>${dayLab(d)}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></rect>`;
+    else if(mk=='tri')g+=`<polygon points="${xs(i)},${S.y(v)-4} ${xs(i)+4},${S.y(v)+3.5} ${xs(i)-4},${S.y(v)+3.5}" fill="${s.c}"><title>${dayLab(d)}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></polygon>`;
+    else g+=`<circle cx="${xs(i)}" cy="${S.y(v)}" r="3.2" fill="${s.c}"><title>${dayLab(d)}: ${s.n} ${(+v).toFixed(dp)} ${s.u}</title></circle>`;
+    if(s.lab)g+=`<text x="${xs(i)}" y="${S.y(v)-7}" text-anchor="middle" class="pl">${(+v).toFixed(dp)}</text>`}})}});
+ (o.lines||[]).forEach(x=>{const S=sc[x.ax||'L'];g+=`<line x1="${l}" x2="${W-r}" y1="${S.y(x.y)}" y2="${S.y(x.y)}" stroke="${x.c}" stroke-width="1.5" stroke-dasharray="5 3"/><text x="${W-r-3}" y="${S.y(x.y)-4}" text-anchor="end" style="fill:${x.c}">${x.t}</text>`});
+ const skip=n>8?2:1;days.forEach((d,i)=>{if(i%skip&&i!==n-1)return;const lab=o.xlab?o.xlab(d,i):(d.d==1?'Today':(d.dow||'').slice(0,3)+((d.date||'').slice(8)?'\n'+Number((d.date||'').slice(8)):''));
+  const parts=String(lab).split('\n');parts.forEach((p,j)=>g+=`<text x="${xs(i)}" y="${t+ph+14+j*11}" text-anchor="middle">${p}</text>`)});
+ g+=`<text class="at" x="${l+pw/2}" y="${H-3}" text-anchor="middle">${o.xt||'Day (6am–6am Mountain time)'}</text></svg>`;
+ const leg=series.map(s=>`<span class="chip"><i class="${chipPat(s)}" style="background:${s.pat&&s.pat!=='solid'?'':s.c}"></i>${s.n}${s.u?` (${s.u})`:''}${s.ax=='R'?' →':''}</span>`).join('')+(o.lines||[]).map(x=>`<span class="chip"><i style="background:${x.c};height:2px;width:14px"></i>${x.t}</span>`).join('');
+ return `${o.title?`<div class="chtitle">${o.title}</div>`:''}${o.sub?`<div class="chsub">${o.sub}</div>`:''}${g}<div class="legend">${leg}</div>`}
+
+const nwsTxt=d=>d.nws&&d.nws.length?d.nws.map(p=>`<div><b>${p.name}</b>: ${p.short} · ${p.temp}°F · PoP ${p.pop}% · ${p.wind}</div>`).join(''):'<div class="muted">No NWS period</div>';
+function spcBadge(d){const p=d.hz&&d.hz.spc;if(!p||p.cat==='none')return'';const lv={TSTM:1,MRGL:2,SLGT:3,ENH:4,MDT:5,HIGH:6}[p.cat]??0;return `<span class="chip hz" title="Storm Prediction Center outlook">SPC: ${p.cat_name}</span>`}
+function hzChips(d){const h=d.hz||{};return (h.flags||[]).map(x=>`<span class="chip hz">${HZI[x]||x}</span>`).join('')+spcBadge(d)}
+
+function amtChart(ds,title){
+ const hasSnow=ds.some(d=>d.amt&&d.amt.snow_in>=0.05);
+ const series=[{n:'Expected liquid',u:'in',c:'#0284c7',bar:1,v:d=>d.amt&&d.amt.mean_in,dp:2},
+  {n:'If it rains: likely low',u:'in',c:'#7dd3fc',v:d=>d.amt&&d.amt.c25_in,dp:2,marker:'circle'},
+  {n:'If it rains: likely high',u:'in',c:'#0369a1',v:d=>d.amt&&d.amt.c75_in,dp:2,marker:'circle'},
+  {n:'If it rains: could reach',u:'in',c:'#64748b',v:d=>d.amt&&d.amt.c90_in,dp:2,dash:1}];
+ if(hasSnow)series.push({n:'Snow (inches of snow)',u:'in of snow',c:'#6366f1',bar:1,pat:'diag',v:d=>d.amt&&d.amt.snow_in,dp:1});
+ return `<div class="card">${chart(ds,series,{title:title||'Precipitation amounts',sub:'Bars = expected liquid (chance × typical wet amount). Lines = amount if rain falls. Snow is inches of snow, not liquid.',L:{t:'Amount (inches)',min:0}})}
+ <p class="muted" style="margin-top:8px">${LEG}</p></div>`}
+function ptypeChart(s,ds){ds=ds||s.days;
+ const T=[['rain',PTYPE.rain],['snow',PTYPE.snow],['frzr',PTYPE.frzr],['sleet',PTYPE.sleet]];
+ const act=T.filter(([k])=>ds.some(d=>d.hz&&d.hz.ptype_abs&&(d.hz.ptype_abs[k]||0)>0.5));
+ let g=`<div class="card">`;
+ if(!act.length)return g+`<div class="chtitle">Precipitation chance by type</div><p class="none">No rain, snow, sleet or ice expected in this period.</p></div>`;
+ const series=act.map(([k,p],i)=>({n:p.n,u:'%',c:p.c,pat:p.pat,bar:k==='rain'||act.length===1,marker:k==='snow'?'diamond':k==='sleet'?'tri':k==='frzr'?'diamond':'circle',v:d=>d.hz&&d.hz.ptype_abs?d.hz.ptype_abs[k]:null,lab:act.length<=2}));
+ return g+chart(ds,series,{title:'Precipitation chance by type',sub:'Daily chance of each type. Types with ~0% chance are hidden. Colors and patterns stay the same everywhere in the app.',L:{t:'Daily chance (%)',min:0,max:100}})+`</div>`}
+function thunderChart(s,ds){const wk=!!ds;ds=ds||s.days;
+ if(!ds.some(d=>d.hz&&(d.hz.nbm_tstm||0)>=5))return'';
+ let g=`<div class="card">${chart(ds,[{n:'Thunder chance',u:'%',c:'#ca8a04',bar:1,v:d=>d.hz&&d.hz.nbm_tstm}],{title:'Thunderstorm chance',sub:'National Blend 12-hour thunder probability.',L:{t:'Thunder chance (%)',min:0,max:100},lines:[{y:25,c:'#ca8a04',t:'flag ≥25%'}]})}`;
+ return g+`</div>`}
+function tempChart(ds){if(!ds[0]||ds[0].hi==null||ds[0].hi==='—')return'';
+ return `<div class="card">${chart(ds,[{n:'High',u:'°F',c:'#ef4444',v:d=>+d.hi||null,lab:1},{n:'Low',u:'°F',c:'#3b82f6',v:d=>+d.lo||null,lab:1},{n:'High range (10–90%)',u:'°F',c:'#fca5a5',dash:1,v:d=>d.hi_rng?d.hi_rng[0]:null},{n:'High range high',u:'°F',c:'#fca5a5',dash:1,v:d=>d.hi_rng?d.hi_rng[1]:null},{n:'Low range (10–90%)',u:'°F',c:'#93c5fd',dash:1,v:d=>d.lo_rng?d.lo_rng[0]:null},{n:'Low range high',u:'°F',c:'#93c5fd',dash:1,v:d=>d.lo_rng?d.lo_rng[1]:null}],{title:'Temperature',sub:'Solid = forecast high/low. Dashed = 80% range (about 8 of 10 days fall inside).',L:{t:'Temperature (°F)',tight:1}})}</div>`}
+function windChart(ds,pass){const T=D.thresholds;const lines=pass?[{y:T.gust_mph,c:'#dc2626',t:'Gust alert '+T.gust_mph+' mph'}]:[];
+ return `<div class="card">${chart(ds,[{n:'Max sustained wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph},{n:'Max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1,marker:'diamond'},{n:'Gust range low',u:'mph',c:'#fcd34d',dash:1,v:d=>d.gust_rng?d.gust_rng[0]:null},{n:'Gust range high',u:'mph',c:'#fcd34d',dash:1,v:d=>d.gust_rng?d.gust_rng[1]:null}],{title:'Wind and gusts',sub:'Daily max sustained wind and gust. Dashed = 80% gust range.',L:{t:'Speed (mph)',min:0},lines})}</div>`}
+
 function hero(k,s){const n=s.now||{},d1=s.days[0],h0=(s.hourly||[])[0]||{};const day=h0.day!==false;const rain=(d1.pop||0)>=.5;
  const ic=n.text?wxIcon(n.text,day):wxIcon(h0.short,day);
  return `<div class="hero ${!day?'night':rain?'rain':''}"><div class="loc">${s.name} · ${s.elev_ft.toLocaleString()} ft</div>
  <div class="now"><div class="t">${n.temp_f!=null?Math.round(n.temp_f)+'°':(h0.temp!=null?h0.temp+'°':'—')}</div><div><div class="ic">${ic}</div></div></div>
  <div class="cond">${n.text||h0.short||''}</div><div class="hl">H ${d1.hi||'—'}° · L ${d1.lo||'—'}°${n.wind_mph!=null?` · Wind ${Math.round(n.wind_mph)}${n.gust_mph?' g'+Math.round(n.gust_mph):''} mph`:''}</div>
- <div class="sum">${s.summary||''}</div><div class="src">${n.station?`Now: ${n.station}, ${ago(n.time)}${n.sky_src?' · sky: forecast ('+n.sky_src+')':(n.text_from?' · sky from '+n.text_from:'')}`:'Current obs unavailable; showing forecast'}</div></div>`}
-function alertBanner(k,s){let out='';(s.nws_alerts||[]).forEach(a=>out+=`<div class="alertb">⚠️ NWS ${a.event}<small>${a.headline||''}</small></div>`);
- if(k=='san_augustin_pass'){const a=D.pass_alert;out+=a.alert?`<div class="alertb">⚠️ Pass alert<small>${a.reasons.join('<br>')}</small></div>`:`<div class="alertb ok">✓ No pass alert — no high wind, low visibility, snow or ice in the next 10 days${a.near.length?`<small>Near threshold: ${a.near.map(x=>x.split(':')[0].split(' 6am')[0]).join(', ')}</small>`:''}</div>`}
- const hz=s.days.filter(d=>d.d<=3&&d.hz&&d.hz.flags&&d.hz.flags.length);if(hz.length)out+=`<div class="alertb" style="background:linear-gradient(135deg,#a16207,#eab308)">⚡ ${hz.map(d=>d.dow+': '+d.hz.flags.join(', ')).join(' · ')}</div>`;return out}
+ <div class="src">${n.station?`Now: ${n.station}, ${ago(n.time)}`:'Current obs unavailable; showing forecast'} · Updated ${D.issued}</div></div>`}
+
+function whatMatters(k,s){
+ const days=k==='cloudcroft'?s.days.filter(d=>D.weekend.includes(d.d)):s.days;
+ const wet=days.filter(d=>(d.pop||0)>=0.2).sort((a,b)=>b.pop-a.pop)[0];
+ const windy=days.filter(d=>(d.gust_mph||0)>=25).sort((a,b)=>b.gust_mph-a.gust_mph)[0];
+ const hz=days.filter(d=>d.hz&&d.hz.flags&&d.hz.flags.length);
+ const st=(D.storms[k]||[])[0];
+ let lead='';
+ if(k==='san_augustin_pass'){
+   const a=D.pass_alert;
+   lead=a.alert?`Drive carefully: ${a.reasons[0].replace(/^[^:]+:\s*/,'')}`:'No pass alerts for high wind, low visibility, snow or ice in the next 10 days.';
+ }else if(wet&&wet.pop>=0.5){
+   const a=wet.amt||{};lead=`${wet.d===1?'Today':wet.dow}: ${pct(wet.pop)} chance of rain — ${crng(a)||'amounts uncertain'}.`;
+ }else if(st){lead=`Next storm ${st.name}: about ${f(st.mean_in,2)}″ expected liquid (peak daily chance ${st.peak_pop}%).`;
+ }else if(wet){lead=`Best rain chance is ${wet.d===1?'today':wet.dow} (${pct(wet.pop)}). ${crng(wet.amt||{})||'Mostly dry otherwise.'}`;
+ }else lead='Mostly dry over this period. No strong storm signal.';
+ if(windy&&windy.gust_mph>=35&&k!=='san_augustin_pass')lead+=` Windy ${windy.d===1?'today':windy.dow}, gusts near ${f(windy.gust_mph)} mph.`;
+ let rows='';
+ if(wet){const a=wet.amt||{};rows+=`<div class="row"><div>💧</div><div><b>Precipitation${wet.d===1?' today':' — '+wet.dow}</b><span class="muted"> · ${pct(wet.pop)} chance of measurable rain</span><br>${crng(a)||'Amount uncertain'}${(a.snow_in||0)>=0.05?` · ❄️ ${f(a.snow_in,1)}″ of snow`:''}${(a.ice_in||0)>=0.005?` · 🧊 ${f(a.ice_in,2)}″ ice`:''}</div></div>`}
+ else rows+=`<div class="row"><div>💧</div><div><b>Precipitation</b><br><span class="muted">No meaningful rain chance in view.</span></div></div>`;
+ if(windy)rows+=`<div class="row"><div>💨</div><div><b>Wind${windy.d===1?' today':' — '+windy.dow}</b><br>Gusts up to about ${f(windy.gust_mph)} mph (sustained ~${f(windy.wind_mph)} mph).</div></div>`;
+ else rows+=`<div class="row"><div>💨</div><div><b>Wind</b><br><span class="muted">No strong winds expected.</span></div></div>`;
+ if(hz.length)rows+=`<div class="row"><div>⚡</div><div><b>Hazards</b><br>${hz.map(d=>`${d.d===1?'Today':d.dow}: ${(d.hz.flags||[]).map(x=>HZI[x]||x).join(', ')}`).join(' · ')}</div></div>`;
+ return `<div class="card matter"><div class="lead">${lead}</div><div class="rows">${rows}</div><p class="muted" style="margin:10px 0 0">${LEG}</p></div>`}
+
+function alertBanner(k,s){let out='';
+ (s.nws_alerts||[]).forEach(a=>out+=`<div class="alertb">⚠️ NWS ${a.event}<small>${a.headline||''}</small></div>`);
+ if(k==='san_augustin_pass'){const a=D.pass_alert;
+  out+=a.alert?`<div class="alertb">⚠️ Pass alert<small>${a.reasons.join('<br>')}</small></div>`:`<div class="alertb ok">✓ No pass alerts<small>No high wind (≥45 mph gusts), low visibility (&lt;1 mi), snow, freezing rain or sleet in the next 10 days.${a.near.length?`<br>Near threshold: ${a.near.join('; ')}`:''}</small></div>`}
+ const hz=s.days.filter(d=>d.d<=3&&d.hz&&d.hz.flags&&d.hz.flags.length);
+ if(hz.length&&k!=='san_augustin_pass')out+=`<div class="alertb warn">⚡ Near-term hazards<small>${hz.map(d=>(d.d===1?'Today':d.dow)+': '+d.hz.flags.map(x=>HZI[x]||x).join(', ')).join(' · ')}</small></div>`;
+ return out}
+
 function organCells(k){const O=D.organ_cells;const tg={wsmr_hawk:'hawk',san_augustin_pass:'pass'}[k];if(!O||!tg||!(O.targets||[]).includes(tg))return'';
- const nm=tg=='hawk'?'Hawk St (east slope)':'San Augustin Pass';const v=(O.validation||{})[tg];const rt=O.radar_time?hh(O.radar_time):'?';
+ const nm=tg=='hawk'?'Hawk St (east slope)':'San Augustin Pass';const rt=O.radar_time?hh(O.radar_time):'?';
  const C=(O.cells||[]).filter(c=>c['p_'+tg]!=null);
- const body=C.length?C.map(c=>c['now40_'+tg]?`<li>⛈️ Heavy rain (≥40 dBZ) is already within 5 mi of ${nm}; a cell ${c.dist_km} km west of the crest (${c.maxdbz} dBZ) is following.</li>`:`<li>⛈️ Storm cell <b>${c.dist_km} km west</b> of the Organ crest (${c.maxdbz} dBZ, ${c.area_km2} km², moving toward ${c.heading_deg}° at ${c.speed_mph} mph): <b>${Math.round(c['p_'+tg]*100)}%</b> chance it brings heavy rain (≥40 dBZ on radar) within 5 mi of ${nm} in the next 90 min${c['eta_'+tg+'_min']<=120?` (if it holds together, arrival ~${c['eta_'+tg+'_min']} min)`:''}.</li>`).join(''):`<li>No storm cells (≥40 dBZ) 5–20 km west of the Organs moving toward ${nm} on the latest radar.</li>`;
- return `<div style="margin-top:8px"><b>🏔️ Storms approaching the Organs</b> <span class="muted">(radar ${rt})</span><ul style="margin:4px 0 0 18px;padding:0">${body}</ul><div class="muted">Year-round. From the cell's size, strength, speed and track, plus HRRR steering wind; trained on ${O.train_years||'past'} radar cases.${v?` Held-out test (Jul 2025–Oct 2026, ${v.days_test} storm days): ${Math.round(v.bss*100)}% better than climatology (95% CI ${Math.round(v.ci[0]*100)}–${Math.round(v.ci[1]*100)}%).`:''} Updated hourly, so a fast storm can arrive before the next refresh.</div></div>`}
-function nowcastCard(k){const N=D.nowcast;if(!N||!N.points||!N.points[k]){const oc=organCells(k);return oc?`<div class="sec">Next 4 hours</div><div class="card">${oc}</div>`:''};const p=N.points[k];const rt=N.radar_time?new Date(N.radar_time):null;
- if(!N.active||!(p.hours||[]).length){return `<div class="sec">Next 4 hours</div><div class="card"><div class="muted">📡 Radar ${N.radar_time?'as of '+hh(N.radar_time)+'. ':''}${p.echo_max60!=null?`Strongest echo within 60 km: ${Math.round(p.echo_max60)} dBZ.`:'No radar echoes within 60 km.'}${p.motion_kmh!=null&&p.echo_max60!=null?` Echoes moving ${Math.round(p.motion_kmh)} km/h.`:''} ${N.note?('Hourly rain chances: '+N.note):''}</div>${organCells(k)}</div>`}
- const mx=Math.max(.25,...p.hours.map(h=>h.pop));return `<div class="sec">Next 4 hours (radar nowcast)</div><div class="card"><div class="hours">${p.hours.map(h=>`<div class="hr"><div class="h">${hh(h.valid_utc)}</div><div class="i">${h.pop>=.5?'⛈️':h.pop>=.2?'🌦️':'☁️'}</div><div style="height:46px;display:flex;align-items:flex-end;justify-content:center"><div style="width:22px;height:${Math.max(2,Math.round(h.pop/mx*44))}px;background:#0284c7;border-radius:3px"></div></div><div class="p">${Math.round(h.pop*100)}%</div></div>`).join('')}</div><div class="muted">Chance of measurable rain (≥0.01″) in each hour (ending at the time shown), from live radar motion, the latest HRRR and terrain${p.echo_max15!=null?`; echo near here now ${Math.round(p.echo_max15)} dBZ`:''}${p.motion_kmh!=null?`, storms moving ${Math.round(p.motion_kmh)} km/h`:''}. Radar as of ${rt?hh(rt):'?'}. Tested for Jun–Sep only; beyond 4 h it adds no skill over the standard forecast.</div>${organCells(k)}</div>`}
+ const body=C.length?C.map(c=>c['now40_'+tg]?`<li>Heavy rain is already within 5 mi of ${nm}.</li>`:`<li>Storm cell <b>${c.dist_km} km west</b> of the Organ crest (${c.maxdbz} dBZ): <b>${Math.round(c['p_'+tg]*100)}%</b> chance of heavy rain near ${nm} in the next 90 min.</li>`).join(''):`<li>No storm cells west of the Organs heading this way on the latest radar.</li>`;
+ return `<div style="margin-top:8px"><b>🏔️ Storms near the Organs</b> <span class="muted">(radar ${rt})</span><ul style="margin:4px 0 0 18px;padding:0">${body}</ul></div>`}
+function nowcastCard(k){const N=D.nowcast;if(!N||!N.points||!N.points[k]){const oc=organCells(k);return oc?`<div class="sec">Next few hours</div><div class="card">${oc}</div>`:''}
+ const p=N.points[k];const rt=N.radar_time?new Date(N.radar_time):null;
+ if(!N.active||!(p.hours||[]).length){const oc=organCells(k);if(!oc&&(p.echo_max60==null||p.echo_max60<20))return'';
+  return `<div class="sec">Next few hours</div><div class="card"><div class="muted">📡 Radar ${N.radar_time?'as of '+hh(N.radar_time)+'. ':''}${p.echo_max60!=null?`Strongest echo within 60 km: ${Math.round(p.echo_max60)} dBZ.`:'No radar echoes within 60 km.'}</div>${oc}</div>`}
+ const mx=Math.max(.25,...p.hours.map(h=>h.pop));
+ return `<div class="sec">Next 4 hours</div><div class="card"><div class="hours">${p.hours.map(h=>`<div class="hr"><div class="h">${hh(h.valid_utc)}</div><div class="i">${h.pop>=.5?'⛈️':h.pop>=.2?'🌦️':'☁️'}</div><div style="height:46px;display:flex;align-items:flex-end;justify-content:center"><div style="width:22px;height:${Math.max(2,Math.round(h.pop/mx*44))}px;background:var(--rain);border-radius:3px"></div></div><div class="p">${Math.round(h.pop*100)}%</div></div>`).join('')}</div><div class="muted">Chance of measurable rain each hour, from live radar + terrain. Radar as of ${rt?hh(rt):'?'}.</div>${organCells(k)}</div>`}
+
+function hourStrip(s){const H=s.hourly||[];if(!H.length)return'';
+ return `<div class="sec">Next 48 hours</div><div class="card"><div class="hours">${H.map((h,i)=>`<div class="hr"><div class="h">${i?hh(h.t):'Now'}</div><div class="i">${wxIcon(h.short,h.day)}</div><div class="tt">${h.temp}°</div><div class="p">${h.pop>=10?h.pop+'%':''}</div><div class="w">${(h.wind||'').replace(' mph','').replace(' to ','–')}${h.gust_corr?' g'+h.gust_corr:''}</div></div>`).join('')}</div>
+ <div class="muted">Temps & rain % from NWS; gusts (“g”) from this app’s correction where available.</div></div>`}
+
+function stormCards(key,dayFilter){let S=(D.storms[key]||[]);if(dayFilter)S=S.filter(x=>x.days.some(d=>dayFilter.includes(d)));
+ if(!S.length)return `<div class="card"><p class="none">No storm events expected${dayFilter?' this weekend':' in the next 10 days'}.</p></div>`;
+ return `<div class="wk">${S.map(x=>`<div class="card storm"><div style="font-weight:700">${x.name}</div><div class="muted">${x.start} → ${x.end}</div><div class="big" style="font-size:22px">${f(x.mean_in,2)}″</div><div class="muted">expected liquid · peak chance ${x.peak_pop}%</div><div class="muted">${crng(x)}</div><div class="chips">${x.snow_in>=0.05?`<span class="chip s">❄️ ${f(x.snow_in,1)}″ snow (in of snow)</span>`:''}${x.ice_in>=0.01?`<span class="chip i">🧊 ${f(x.ice_in,2)}″ ice</span>`:''}</div></div>`).join('')}</div>`}
+
+function tenDay(s){const his=s.days.map(d=>+d.hi).filter(x=>!isNaN(x)),los=s.days.map(d=>+d.lo).filter(x=>!isNaN(x));const mn=Math.min(...los,0),mx=Math.max(...his,1),sp=Math.max(1,mx-mn);
+ return `<div class="sec">10-day forecast</div><div class="card" style="padding:4px 10px">${s.days.map(d=>{const lo=+d.lo,hi=+d.hi,ok=!isNaN(lo)&&!isNaN(hi);const a=d.amt||{};
+  return `<div class="dl" onclick="this.classList.toggle('open')"><div class="dw">${d.d==1?'Today':d.dow}</div><div class="ic">${icon(d)}</div>
+  <div class="pp">${(d.pop||0)>=.1?`💧 ${pct(d.pop)}<span class="amt">${amtShort(a)||''}${(a.snow_in||0)>=0.05?` · ❄️${f(a.snow_in,1)}″`:''}</span>`:'—'}</div>
+  <div class="lo">${ok?lo+'°':'—'}</div><div class="bar">${ok?`<i style="left:${(lo-mn)/sp*100}%;right:${(mx-hi)/sp*100}%"></i>`:''}</div><div class="hi">${ok?hi+'°':''}</div>
+  <div class="dlx">${d.sky?`<div style="margin-bottom:4px">${d.sky}</div>`:''}
+   <div><b>Rain:</b> ${pct(d.pop)} chance. ${amt(d)||'—'}</div>
+   <div><b>Wind:</b> ${f(d.wind_mph)} mph, gusts ${f(d.gust_mph)} mph${d.gust_rng?` (80% range ${rg(d.gust_rng)} mph)`:''}</div>
+   <div class="chips">${accChips(d)}${hzChips(d)}</div>
+   <details style="margin-top:6px"><summary class="muted">NWS forecast for comparison</summary>${nwsTxt(d)}</details>
+  </div></div>`}).join('')}
+  <p class="muted" style="font-size:12px;margin:8px 0 4px">Tap a day for details. 💧 ${LEG}</p></div>`}
+
+function weekendCards(s){const w=s.days.filter(d=>D.weekend.includes(d.d));
+ const t=D.totals.cloudcroft;
+ return `<div class="sec">This weekend</div>
+ <div class="card"><div class="muted">Fri–Sun precipitation</div><div class="big">💧 ${f(t.mean_in,2)}″ <span class="muted" style="font-size:14px">expected liquid</span></div>
+ <div class="muted">${crng(t)}${t.snow_in>=0.05?` · ❄️ ${f(t.snow_in,1)}″ snow (in of snow)`:''}</div></div>
+ <div class="wk">${w.map(d=>`<div class="card"><div class="muted">${d.dow} ${(d.date||'').slice(5)}</div>
+  <div class="big">${icon(d)} ${d.hi||''}°<span class="muted" style="font-size:15px"> / ${d.lo||''}°</span></div>
+  <div style="margin-top:6px"><b>💧 ${pct(d.pop)}</b> chance of rain</div><div class="muted">${amt(d)}</div>
+  <div style="margin-top:4px">💨 Gusts ${f(d.gust_mph)} mph</div>
+  <div class="chips">${accChips(d)}${hzChips(d)}</div></div>`).join('')}</div>`}
+
+function details(k,s){
+ const pass=k==='san_augustin_pass', cloud=k==='cloudcroft';
+ const ds=cloud?s.days.filter(d=>D.weekend.includes(d.d)):s.days;
+ let o=`<div class="sec">Charts & details</div>`;
+ o+=`<details class="card"><summary>Precipitation charts</summary>${amtChart(ds,cloud?'Weekend precipitation amounts':'Precipitation amounts')}${ptypeChart(s,ds)}${thunderChart(s,ds)}</details>`;
+ o+=`<details class="card"><summary>Temperature & wind charts</summary>${tempChart(s.days)}${windChart(s.days,pass)}`;
+ if(pass){const T=D.thresholds;
+  o+=chart(s.days,[{n:'Chance visibility under 1 mile',u:'%',c:'#a855f7',bar:1,v:d=>d.p_vis_lt1==null?null:d.p_vis_lt1*100}],{title:'Low-visibility chance',sub:'National Blend probability of visibility under 1 mile.',L:{t:'Chance (%)',min:0,max:100},lines:[{y:T.p_vis*100,c:'#a855f7',t:'Alert '+T.p_vis*100+'%'}]});
+  o+=`<p class="muted">HRRR minimum visibility: day 1 ${f(s.days[0].vis_min_mi,1)} mi, day 2 ${f(s.days[1].vis_min_mi,1)} mi.</p>`;
+ }
+ o+=`</details>`;
+ if(k==='wsmr_hawk')o+=`<details class="card"><summary>Storm & pattern discussion</summary>${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p class="muted">Nothing notable.</p>'}
+  <h3 style="margin-top:10px">Pattern notes</h3><ul>${D.hawk_disc.join('')}</ul>
+  <details style="margin-top:8px"><summary>NWS El Paso Area Forecast Discussion</summary><pre>${D.afd.replace(/</g,'&lt;')}</pre></details></details>`;
+ if(cloud)o+=`<details class="card"><summary>Full 10-day list</summary>${s.days.map(d=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>${dayLab(d)}</b> · 💧 ${pct(d.pop)} · ${amt(d)} · gust ${f(d.gust_mph)} mph ${accChips(d)}</div>`).join('')}</details>`;
+ o+=`<details class="card"><summary>How this forecast works</summary>
+  <p>This app corrects national models (HRRR for days 1–2, GEFS/ECMWF/NBM for days 1–10) with local station and gauge history and terrain. Issued ${D.issued}.</p>
+  <p class="muted">Guidance used: HRRR ${D.guidance.hrrr||'n/a'}, NBM ${D.guidance.nbm}, GEFS ${D.guidance.gefs}, ECMWF ${D.guidance.ecmwf}.${D.notes.length?' Notes: '+D.notes.join('; '):''}</p>
+  <p>${LEG}</p>
+  <ul style="margin:6px 0 0 18px">
+   <li>Wind at Hawk St and the Pass is transferred from nearby stations (no on-site wind record).</li>
+   <li>Snow amounts are inches of snow, not liquid equivalent; gauges undercatch snow so snow skill is weaker.</li>
+   <li>Visibility, thunder, hail, freezing rain and sleet are mostly raw model/SPC guidance, not locally recalibrated.</li>
+  </ul>
+  <p class="muted" style="margin-top:8px"><a href="#about">See the Accuracy page</a> for verification scores.</p></details>`;
+ return o}
+
+function passView(){const s=D.sites.san_augustin_pass,a=D.pass_alert,T=D.thresholds;
+ return hero('san_augustin_pass',s)+
+  `<div class="status ${a.alert?'al':'ok'}"><b>${a.alert?'⚠️ ALERT':'✓ No alerts'}</b>
+   ${a.alert?a.reasons.map(r=>`<div style="font-weight:500;margin-top:4px">${r}</div>`).join(''):'No high wind, low visibility, snow, freezing rain or sleet forecast in the next 10 days.'}</div>
+  ${a.near.length?`<div class="card note"><h3>Near threshold (not an alert)</h3>${a.near.map(x=>`<div>${x}</div>`).join('')}</div>`:''}
+  <div class="card"><p class="muted" style="margin:0">Alerts fire for: gusts ≥${T.gust_mph} mph, sustained ≥${T.wind_mph} mph, visibility under ${T.vis_mi} mi, any snow, freezing rain or sleet.</p></div>
+  ${whatMatters('san_augustin_pass',s)}
+  ${details('san_augustin_pass',s)}`}
+
+function locView(k){
+ if(k==='san_augustin_pass')return passView();
+ const s=D.sites[k], cloud=k==='cloudcroft';
+ return hero(k,s)+alertBanner(k,s)+`<div class="sec">What matters</div>`+whatMatters(k,s)
+  +nowcastCard(k)+hourStrip(s)
+  +(cloud?weekendCards(s):`<div class="sec">Upcoming storms</div>`+stormCards(k))
+  +(cloud?'':tenDay(s))
+  +details(k,s)
+  +`<p class="muted" style="text-align:center;margin-top:16px">Updated ${D.issued}</p>`}
+
+/* ---- Seasonal ---- */
 function pvCard(){const P=D.polar_vortex;if(!P)return `<div class="card"><h3>🌀 Polar vortex watch</h3><p class="muted">Stratosphere data unavailable right now.</p></div>`;
  const md=s=>{if(!s)return'—';const d=new Date(s.slice(0,10)+'T12:00:00Z');return d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})};
  const r0=x=>{const v=Math.round(x);return (v===0?0:v).toString()},G=P.gefs,O=P.obs_latest,A=P.ao,H=P.history,st=P.status||'unavailable',fc=P.basis=='forecast';
  const lab=st=='Disrupted'?(fc?'Disruption forecast':'Disrupted'):st=='Weakening'?(fc?'Weakening forecast':'Weakening'):st;
  const col=st=='Disrupted'?'#7c3aed':st=='Weakening'?'#d97706':'#16a34a';
- const src=k=>{const v=(P.sources||{})[k]||'unavailable';return v=='ok'?'':` <span class="muted">(${v})</span>`};
- let now=O?`Stratospheric wind (10 hPa, 60°N) on ${md(O.date)}: <b>${r0(O.u)} m/s</b> westerly (normal for the date ${O.clim_mean!=null?r0(O.clim_mean):'—'} m/s).`:'Observed stratospheric wind unavailable.';
- let fcs=G?`GEFS (${G.init}): <b>${G.n_reverse} of ${G.members}</b> members reverse to easterly (below 0)${G.first_reverse_median?`, median date ${md(G.first_reverse_median)}`:''}; ensemble mean bottoms at ${r0(G.min_mean)} m/s around ${md(G.min_mean_date)}.`:'GEFS forecast unavailable.';
- const gm=P.gfs&&P.gfs.series?P.gfs.series.filter(x=>x[1]!=null):[];if(gm.length){const mn=gm.reduce((a,b)=>b[1]<a[1]?b:a);fcs+=` GFS (${P.gfs.init}) low: ${r0(mn[1])} m/s on ${md(mn[0])}.`}
- const win=P.cold_window?`<div class="card note" style="margin:8px 0"><b>${fc?'Tentative window':'Window'} for elevated odds of cold spells: ${md(P.cold_window[0])} – ${md(P.cold_window[1])}</b> (about 2–6 weeks after the ${fc?'forecast':'observed'} reversal${fc?'; firms up once a reversal is actually observed':''}). Only if the disruption works its way down to the surface, which many don't.</div>`:'';
- let ao='';if(A&&A.obs&&A.obs.length){const lo=A.obs[A.obs.length-1];ao=`Arctic Oscillation: ${lo[1]>=0?'+':''}${lo[1].toFixed(1)} on ${md(lo[0])}`;
-  if(A.gefs&&A.gefs.length){const mn=A.gefs.reduce((a,b)=>b[1]<a[1]?b:a);ao+=`; GEFS mean forecast reaches ${mn[1]>=0?'+':''}${mn[1].toFixed(1)} around ${md(mn[0])}`}
-  ao+='. A negative AO means cold Arctic air escapes south more easily.'+src('ao')}
- let hist='';if(H&&H.stations){const c=H.stations.cloudcroft,a=H.stations.alamogordo,l=H.stations.las_cruces;
-  hist=`<b>Our check of past events:</b> in the ${H.window_days[0]}–${H.window_days[1]} days after ${c.n} major disruptions since 1958, very cold nights (coldest 10% for the date) were about as common as usual: Cloudcroft ${c.cold_rate}% of nights vs ${c.cold_base}% normally, Alamogordo ${a.cold_rate}% vs ${a.cold_base}% (n=${a.n}, record ends 2009), Las Cruces ${l.cold_rate}% vs ${l.cold_base}% (n=${l.n}). Cloudcroft 1″+ snow days: ${c.snow_rate}% vs ${c.snow_base}%. None of these differences are statistically clear. Past events were nearly all in Dec–Mar; none were this early (earliest on record ${md(H.earliest)}).`}
- const ob=(P.obs||[]).slice(-30),cl=(P.clim_on_obs_dates||[]).slice(-30),rows=ob.map((x,i)=>({dow:'',dt:x[0],o:x[1],c:cl[i]}));
- if(G)G.dates.forEach((d,i)=>{if(i==0&&rows.length&&rows[rows.length-1].dt==d){Object.assign(rows[rows.length-1],{m:G.mean[0],lo:G.p10[0],hi:G.p90[0]});return}rows.push({dow:'',dt:d,m:G.mean[i],lo:G.p10[i],hi:G.p90[i],c:(P.clim_on_gefs_dates||[])[i]})});
- rows.forEach((r,i)=>{r.dow=(i%7==0)?md(r.dt):''});
- const ch=rows.length?chart(rows,[{n:'Observed (GFS analysis)',u:'m/s',c:'#0f172a',v:d=>d.o,dp:1},{n:'GEFS mean',u:'m/s',c:'#7c3aed',v:d=>d.m,dp:1},{n:'GEFS 10th pct',u:'m/s',c:'#a78bfa',dash:1,v:d=>d.lo,dp:1},{n:'GEFS 90th pct',u:'m/s',c:'#c4b5fd',dash:1,v:d=>d.hi,dp:1},{n:'Normal (1991–2020)',u:'m/s',c:'#94a3b8',dash:1,v:d=>d.c,dp:1}],{L:{t:'Zonal wind 10 hPa, 60°N (m/s)'},lines:[{y:0,c:'#ef4444',t:'reversal (0)'}],xt:'Last 30 days observed → 16-day forecast'}):'';
- return `<div class="card"><h3>🌀 Polar vortex watch <span class="muted" style="font-size:12px;font-weight:400">updated ${P.updated?new Date(P.updated.replace('Z',':00Z')).toLocaleString('en-US',{timeZone:'America/Denver',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+' MT':'?'} · heads-up, not a calibrated forecast</span></h3>
-<div class="big" style="font-size:22px;color:${col}">${lab}</div>
-<div class="muted" style="margin:4px 0">${now}${src('obs')}<br>${fcs}${src('gefs')}</div>
-${win}
-<div style="font-size:14px"><b>What it could mean here:</b><ul style="margin:4px 0 0 18px;padding:0">
-<li>If the disruption reaches the surface, colder spells become more likely, with occasional snow at Cloudcroft and San Augustin Pass.</li>
-<li>Arctic air tends to reach the east side of the Sacramentos and the Tularosa Basin more easily than the Rio Grande valley.</li>
-<li>It wouldn't flip the winter: the very strong El Niño and the stratospheric wind pattern this year (westerly QBO) still favor a mild winter overall.</li>
-<li>Some disruptions never reach the surface at all, and the 10-day forecast will show a real cold outbreak once it's about a week out.</li></ul></div>
-${ao?`<div class="muted" style="margin-top:6px">${ao}</div>`:''}
-${ch?`<div style="margin-top:8px">${ch}</div>`:''}
-${hist?`<div class="muted" style="margin-top:6px">${hist}</div>`:''}
-<div class="muted" style="margin-top:6px;font-size:12px">Status: Normal; Weakening (observed wind in the weakest quarter for the date, or 20%+ of GEFS members reversing); Disrupted (reversal observed in the last 6 weeks, or forecast by at least half of GEFS members). Sources: NOAA GFS/GEFS (AWS open data), NCEP/NCAR Reanalysis-1 normals, NOAA CPC Arctic Oscillation, NOAA GHCN-Daily. Refreshed about every 8 hours.</div></div>`}
-function cpcCard(){const C=D.cpc_outlook;if(!C||!C.leads||!C.leads.length)return'';const pts=[['wsmr_hawk','Hawk St'],['san_augustin_pass','Pass'],['cloudcroft','Cloudcroft']];
- const seas=C.leads.filter(L=>/^[A-Z]{3}\b/.test(L.season||'')).slice(0,9),mon=C.leads.filter(L=>!/^[A-Z]{3}\b/.test(L.season||''))[0];
- const cell=r=>!r||r.cat=='EC'||r.prob<=33.5?'<span class="muted">equal chances</span>':`<b style="color:${(r.cat=='Above')==(r._v=='prcp')?'#0369a1':'#b45309'}">${r.cat=='Above'?'Above':'Below'} ${Math.round(r.prob)}%</b>`;
- const row=(L,v)=>`<tr><td>${L.season.replace(' 20','<br>20').replace(/^([A-Za-z]+) (\d{4})$/,'$1 $2')}</td>${pts.map(([k])=>`<td>${cell(L[v][k]&&{...L[v][k],_v:v})}</td>`).join('')}</tr>`;
- const tbl=(v,t)=>`<h3 style="margin-top:10px">${t}</h3><table><tr><th>Window</th>${pts.map(p=>`<th>${p[1]}</th>`).join('')}</tr>${seas.map(L=>row(L,v)).join('')}</table>`;
- const cmp=C.compare||{},cm=pts.map(([k,n])=>cmp[k]?`<li><b>${n}:</b> CPC ${cmp[k].cpc} this winter; our El Niño-based outlook says ${cmp[k].ours} (about ${cmp[k].ours_pct}% of normal Oct–May precip) → ${cmp[k].verdict}.</li>`:'').join('');
- const dr=C.drought||{},dn=pts.map(([k,n])=>dr[k]?`${n}: ${String(dr[k].outlook||'').replace(/_/g,' ').toLowerCase()}${dr[k].target?' by '+dr[k].target:''}`:'').filter(Boolean).join(' · ');
- return `<div class="card"><h3>🗓️ NOAA CPC seasonal outlook <span class="muted" style="font-size:12px;font-weight:400">issued ${C.issued||'?'}</span></h3>
-<div class="muted" style="margin-bottom:6px"><b>How to read it:</b> each 3-month window shows the most likely category versus 1991–2020 normal and its probability. Normal odds are 33% for each of above/near/below, so “Above 40%” means the odds are shifted modestly, not that it will be that way. “Equal chances” means CPC sees no signal. These are shifts in odds for the whole season, not forecasts of specific storms. Skill for New Mexico precipitation is modest (best in strong El Niño winters, weakest in summer).</div>
-${tbl('prcp','Precipitation')}${tbl('temp','Temperature')}
-${mon?`<div class="muted" style="margin-top:6px"><b>${mon.season} (monthly):</b> precip ${pts.map(([k,n])=>n+' '+(mon.prcp[k].cat=='EC'||mon.prcp[k].prob<=33.5?'equal chances':mon.prcp[k].cat+' '+Math.round(mon.prcp[k].prob)+'%')).join(', ')}; temp ${pts.map(([k,n])=>n+' '+(mon.temp[k].cat=='EC'||mon.temp[k].prob<=33.5?'equal chances':mon.temp[k].cat+' '+Math.round(mon.temp[k].prob)+'%')).join(', ')}.</div>`:''}
-${dn?`<div class="muted" style="margin-top:6px"><b>Seasonal drought outlook:</b> ${dn}.</div>`:''}
-${cm?`<h3 style="margin-top:10px">Compared with our own outlook</h3><ul style="margin:4px 0 0 18px">${cm}</ul>`:''}
-<div class="muted" style="margin-top:6px">Source: NOAA Climate Prediction Center. New outlooks come out the third Thursday of each month, with an update at month end; this app checks every build.</div></div>`}
-function hourStrip(s){const H=s.hourly||[];if(!H.length)return'';return `<div class="sec">Next 48 hours</div><div class="card"><div class="hours">${H.map((h,i)=>`<div class="hr"><div class="h">${i?hh(h.t):'Now'}</div><div class="i">${wxIcon(h.short,h.day)}</div><div class="tt">${h.temp}°</div><div class="p">${h.pop>=10?h.pop+'%':''}</div><div class="w"${h.gust_hi?` title="80% range: wind ${h.wind_lo}–${h.wind_hi} mph, gust ${h.gust_lo}–${h.gust_hi} mph"`:''}>${(h.wind||'').replace(' mph','').replace(' to ','–')}${h.gust_corr?' g'+h.gust_corr:''}${h.live?'<span style="color:#e8a33d">●</span>':''}</div></div>`).join('')}</div><div class="muted">Temps, sky & rain % from NWS hourly; wind in mph (gusts “g” from this app's HRRR correction, days 1–2; hold/tap a column for the 80% range).${s.live_obs&&s.live_obs.applied?` <span style="color:#e8a33d">●</span> First hours of the gust figure are nudged toward live observations (${s.live_obs.ref}: ${s.live_obs.obs_ws_mph} mph, gusts ${s.live_obs.obs_gust_mph}, obs ${s.live_obs.obs_time.slice(11,16)}Z).`:''}</div></div>`}
-function tenDay(s){const his=s.days.map(d=>+d.hi).filter(x=>!isNaN(x)),los=s.days.map(d=>+d.lo).filter(x=>!isNaN(x));const mn=Math.min(...los),mx=Math.max(...his),sp=Math.max(1,mx-mn);
- return `<div class="sec">10-day forecast</div><div class="card" style="padding:4px 12px">${s.days.map(d=>{const lo=+d.lo,hi=+d.hi,ok=!isNaN(lo)&&!isNaN(hi);
-  return `<div class="dl" onclick="this.classList.toggle('open')"><div class="dw">${d.d==1?'Today':d.dow}</div><div class="ic">${icon(d)}</div><div class="pp">${(d.pop||0)>=.1?`💧${pct(d.pop)}<br><span title="${LEG}">${d.amt&&d.amt.c25_in!=null?f(d.amt.c25_in,2)+'–'+f(d.amt.c75_in,2)+'″':''}</span>`:''}</div>
-  <div class="lo">${ok?lo+'°':'—'}</div><div class="bar">${ok?`<i style="left:${(lo-mn)/sp*100}%;right:${(mx-hi)/sp*100}%"></i>`:''}</div><div class="hi">${ok?hi+'°':''}</div>
-  <div class="dlx">${d.sky?d.sky+' · ':''}Rain ${pct(d.pop)}, ${amt(d)} · wind ${f(d.wind_mph)} g${f(d.gust_mph)} mph ${accChips(d)}${d.gust_rng?`<div class="muted" style="font-size:12px">80% ranges: gust ${rg(d.gust_rng)} mph, sustained ${rg(d.wind_rng)} mph${ok&&d.hi_rng?`, high ${rg(d.hi_rng)}°, low ${rg(d.lo_rng)}°`:''}${d.amt&&d.amt.q95_in!=null?`, 95th-pct rain total ${f(d.amt.q95_in,2)}″`:''}</div>`:''}${hzChips(d)}${hzDetail(d)}<div style="margin-top:6px"><b>NWS:</b>${nwsTxt(d)}</div></div></div>`}).join('')}<p class="muted" style="font-size:12px;margin:6px 0">💧 ${LEG}</p></div>`}
-function details(k,s){const T=D.thresholds;let o=`<div class="sec">Details</div>`;
- o+=`<details class="card"><summary>Charts: temperature, wind, precipitation</summary>${s.days[0].hi?chart(s.days,[{n:'High',u:'°F',c:'#ef4444',v:d=>+d.hi||null,lab:1},{n:'Low',u:'°F',c:'#3b82f6',v:d=>+d.lo||null,lab:1},{n:'High 10th pct',u:'°F',c:'#fca5a5',dash:1,v:d=>d.hi_rng?d.hi_rng[0]:null},{n:'High 90th pct',u:'°F',c:'#fca5a5',dash:1,v:d=>d.hi_rng?d.hi_rng[1]:null},{n:'Low 10th pct',u:'°F',c:'#93c5fd',dash:1,v:d=>d.lo_rng?d.lo_rng[0]:null},{n:'Low 90th pct',u:'°F',c:'#93c5fd',dash:1,v:d=>d.lo_rng?d.lo_rng[1]:null}],{L:{t:'Temperature (°F)',tight:1}}):''}
-  ${chart(s.days,[{n:'Max wind',u:'mph',c:'#94a3b8',v:d=>d.wind_mph},{n:'Max gust',u:'mph',c:'#f59e0b',v:d=>d.gust_mph,lab:1},{n:'Gust 10th pct',u:'mph',c:'#fcd34d',dash:1,v:d=>d.gust_rng?d.gust_rng[0]:null},{n:'Gust 90th pct',u:'mph',c:'#fcd34d',dash:1,v:d=>d.gust_rng?d.gust_rng[1]:null}],{L:{t:'Speed (mph)',min:0},lines:k=='san_augustin_pass'?[{y:T.gust_mph,c:'#dc2626',t:'Gust alert '+T.gust_mph+' mph'}]:[]})}${amtChart(s.days)}${ptypeChart(s)}</details>`;
- o+=`<details class="card"><summary>Thunder, hail & ice</summary>${thunderChart(s)}</details>`;
- if(k=='san_augustin_pass')o+=`<details class="card"><summary>Visibility</summary>${chart(s.days,[{n:'NBM chance vis < 1 mi',u:'%',c:'#a855f7',bar:1,v:d=>d.p_vis_lt1==null?null:d.p_vis_lt1*100}],{L:{t:'Chance vis < 1 mi (%)',min:0,max:100}})}<p class="muted">HRRR min visibility: day 1 ${f(s.days[0].vis_min_mi,1)} mi, day 2 ${f(s.days[1].vis_min_mi,1)} mi.</p></details>`;
- o+=`<details class="card"><summary>Precipitation totals</summary>${totalCard(k,k=='cloudcroft'?'10-day precipitation total':'10-day precipitation total')}</details>`;
- o+=`<details class="card"><summary>NWS forecast comparison</summary>${s.days.map(d=>`<div style="margin:8px 0"><b>${d.label}</b> · this app: ${pct(d.pop)} rain, ${amt(d)}, gust ${f(d.gust_mph)} mph${nwsTxt(d)}</div>`).join('')}</details>`;
- if(k=='wsmr_hawk')o+=`<details class="card"><summary>Storm & pattern discussion</summary>${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':''}<ul>${D.hawk_disc.join('')}</ul></details><details class="card"><summary>NWS El Paso forecast discussion</summary><pre>${D.afd.replace(/</g,'&lt;')}</pre></details>`;
- return o}
-function locView(k){const s=D.sites[k];const wk=k=='cloudcroft';
- return hero(k,s)+alertBanner(k,s)+nowcastCard(k)+hourStrip(s)+(wk?`<div class="sec">This weekend</div>${totalCard('cloudcroft','Fri–Sun precipitation')}<div class="wk">${s.days.filter(d=>D.weekend.includes(d.d)).map(d=>`<div class="card"><div class="muted">${d.dow} ${d.date.slice(5)}</div><div class="big">${icon(d)} ${d.hi||''}°<span class="muted" style="font-size:15px"> / ${d.lo||''}°</span></div><div>💧 ${pct(d.pop)} · ${amt(d)}</div><div>Gusts ${f(d.gust_mph)} mph</div><div class="chips">${accChips(d)}${hzChips(d)}</div></div>`).join('')}</div>`:'')
-  +`<div class="sec">Storms</div>`+stormCards(k,wk?null:null)+tenDay(s)+details(k,s)+`<p class="muted" style="text-align:center">Updated ${D.issued}${D.notes.length?' · '+D.notes.join('; '):''}</p>`}
-// ---------- maps ----------
-let MAP=null,RL=null,timer=null;
-function mapsView(){return `<div class="sec">Maps</div><div class="mapctl"><button id="mRadar" class="on">Radar</button><button id="mSat">Satellite</button><button id="mQpf">Forecast rain (HRRR)</button><button id="mPlay">⏸</button><input type="range" id="mSlide" min="0" max="0" value="0"><span id="mTime" class="muted"></span></div><div id="map"></div><div id="mLeg" class="legend" style="margin-top:6px"></div><p class="muted">Radar: RainViewer (free, past ~2 h, 10-min frames). Forecast rain: ${D.qpf_map?D.qpf_map.source:''} rendered by this app (6-hour totals, 0–48 h). Satellite: NASA GIBS GOES-East IR (free, no key). Base map © OpenStreetMap.</p>`}
+ let now=O?`Stratospheric wind (10 hPa, 60°N) on ${md(O.date)}: <b>${r0(O.u)} m/s</b> westerly (normal ~${O.clim_mean!=null?r0(O.clim_mean):'—'} m/s).`:'Observed stratospheric wind unavailable.';
+ let fcs=G?`GEFS: <b>${G.n_reverse} of ${G.members}</b> members reverse to easterly${G.first_reverse_median?`, median date ${md(G.first_reverse_median)}`:''}.`:'GEFS forecast unavailable.';
+ const win=P.cold_window?`<div class="card note" style="margin:8px 0 0"><b>${fc?'Tentative window':'Window'} for elevated odds of cold spells: ${md(P.cold_window[0])} – ${md(P.cold_window[1])}</b>. Only if the disruption reaches the surface — many don't. Past events here have not shown a clear local cold signal.</div>`:'';
+ const ob=(P.obs||[]).slice(-30),cl=(P.clim_on_obs_dates||[]).slice(-30),rows=ob.map((x,i)=>({dow:'',date:x[0],o:x[1],c:cl[i]}));
+ if(G)G.dates.forEach((d,i)=>{if(i==0&&rows.length&&rows[rows.length-1].date==d){Object.assign(rows[rows.length-1],{m:G.mean[0],lo:G.p10[0],hi:G.p90[0]});return}rows.push({dow:'',date:d,m:G.mean[i],lo:G.p10[i],hi:G.p90[i],c:(P.clim_on_gefs_dates||[])[i]})});
+ rows.forEach((r,i)=>{r.dow=(i%5===0)?md(r.date):'';r.d=i+1});
+ const ch=rows.length?chart(rows,[{n:'Observed',u:'m/s',c:'#0f172a',v:d=>d.o,dp:1},{n:'GEFS mean',u:'m/s',c:'#7c3aed',v:d=>d.m,dp:1},{n:'GEFS range low',u:'m/s',c:'#a78bfa',dash:1,v:d=>d.lo,dp:1},{n:'GEFS range high',u:'m/s',c:'#c4b5fd',dash:1,v:d=>d.hi,dp:1},{n:'Normal',u:'m/s',c:'#94a3b8',dash:1,v:d=>d.c,dp:1}],{title:'Stratospheric wind (10 hPa, 60°N)',sub:'Last ~30 days observed, then 16-day GEFS forecast. Crossing 0 = a major disruption.',L:{t:'Zonal wind (m/s)'},lines:[{y:0,c:'#ef4444',t:'reversal (0)'}],xt:'Date',xlab:(d)=>d.dow}):'';
+ return `<div class="card"><h3>🌀 Polar vortex watch</h3>
+ <div class="big" style="font-size:22px;color:${col}">${lab}</div>
+ <div class="muted" style="margin:4px 0">${now}<br>${fcs}</div>${win}
+ <p style="font-size:14px;margin:8px 0 0"><b>What it could mean here:</b> if it reaches the surface, colder spells become a bit more likely (especially Cloudcroft / east of the Sacramentos). It does not flip the winter — the strong El Niño still favors mild overall. Treat this as a heads-up, not a calibrated forecast.</p>
+ ${ch?`<div style="margin-top:10px">${ch}</div>`:''}
+ <details style="margin-top:8px"><summary class="muted">Sources & history check</summary><p class="muted">GFS/GEFS (AWS), NCEP Reanalysis-1 normals, CPC Arctic Oscillation. Refreshed about every 8 hours.${H&&H.stations?` After ${H.stations.cloudcroft.n} past major disruptions, very cold nights here were about as common as usual.`:''}</p></details></div>`}
+
+function seasView(){const S=D.seasonal;if(!S)return'<p class="muted">Seasonal outlook not available.</p>';
+ const W=S.winter,M=S.monsoon,E=S.enso,r1=x=>x==null?'—':(+x).toFixed(1),r2=x=>x==null?'—':(+x).toFixed(2);
+ const cc=W.cloudcroft,hk=W.wsmr_hawk,mm=M.wsmr_hawk,mc=M.cloudcroft;
+ return `<h2>Seasonal outlook</h2>
+ <div class="card matter"><div class="lead">${E.forecast_class}</div>
+  <div class="muted">Latest ONI ${E.oni_latest} · PDO ${r2(E.pdo_latest)} (${E.pdo_latest<0?'negative':'positive'})</div>
+  <div class="rows" style="margin-top:10px">
+   <div class="row"><div>❄️</div><div><b>Cloudcroft winter snow</b><br>~${r1(cc.best_snow.central)}″ expected (likely ${r1(cc.best_snow.lo)}–${r1(cc.best_snow.hi)}″; normal ${r1(cc.normal&&cc.normal.median)}″)</div></div>
+   <div class="row"><div>🌨️</div><div><b>Hawk St area winter snow</b><br>~${r1(hk.best_snow.central)}″ (normal ${r1(hk.normal&&hk.normal.median)}″; Las Cruces proxy)</div></div>
+   <div class="row"><div>🌩️</div><div><b>Monsoon 2027</b><br>Near normal ~${r2(mm.total_best&&mm.total_best.central)}″ at Hawk St — <b>very low skill</b> this far out.</div></div>
+  </div></div>
+ ${pvCard()}
+ <details class="card"><summary>Winter snowfall details & charts</summary>
+  <div class="card" style="border:0;padding:0">${chart(cc.months.map((m,i)=>({dow:m,a:cc.mon_normal[i],b:cc.mon_strong[i],d:i+1,date:''})),[{n:'Normal (1991–2020)',u:'in of snow',c:'#94a3b8',bar:1,v:d=>d.a,dp:1},{n:'Strong El Niño winters',u:'in of snow',c:'#6366f1',bar:1,pat:'diag',v:d=>d.b,dp:1}],{title:'Cloudcroft: when the snow usually comes',sub:'Mean monthly snowfall in inches of snow.',L:{t:'Snowfall (inches of snow)',min:0},xt:'Month'})}</div>
+  <div class="card" style="border:0;padding:0;margin-top:8px">${chart(cc.strong_years.map(([y,v],i)=>({dow:String(y).slice(0,4),v,d:i+1,date:''})),[{n:'Season snowfall',u:'in of snow',c:'#6366f1',bar:1,pat:'diag',v:d=>d.v,dp:0}],{title:'Cloudcroft: every strong El Niño winter on record',sub:'2023–24 (strong El Niño + negative PDO, like now) was below normal — a big El Niño does not guarantee big snow.',L:{t:'Snowfall (inches of snow)',min:0},lines:[{y:cc.normal.median,c:'#64748b',t:'normal '+r1(cc.normal.median)+'″'}],xt:'Winter start year'})}</div>
+ </details>
+ <details class="card"><summary>NOAA CPC & NMME outlooks</summary>
+  <p class="muted">These are shifts in seasonal odds, not storm forecasts. Skill for New Mexico precip is modest.</p>
+  ${(()=>{const C=D.cpc_outlook;if(!C||!C.leads)return'<p class="muted">CPC outlook unavailable.</p>';
+   const pts=[['wsmr_hawk','Hawk'],['cloudcroft','Cloudcroft']];
+   const seas=C.leads.filter(L=>/^[A-Z]{3}\b/.test(L.season||'')).slice(0,6);
+   const cell=r=>!r||r.cat=='EC'||r.prob<=33.5?'equal chances':`${r.cat} ${Math.round(r.prob)}%`;
+   return `<table><tr><th>Season</th>${pts.map(p=>`<th>${p[1]} precip</th>`).join('')}</tr>${seas.map(L=>`<tr><td>${L.season}</td>${pts.map(([k])=>`<td>${cell(L.prcp[k])}</td>`).join('')}</tr>`).join('')}</table>`})()}
+ </details>
+ <details class="card"><summary>How the seasonal outlook is built</summary>
+  <ul><li>Expected totals shrink the strong-El-Niño composite toward the 1991–2020 normal because only a handful of strong events exist.</li>
+  <li>ENSO explains at most about a quarter of year-to-year snowfall variance at Cloudcroft, less in the lowlands.</li>
+  <li>No long record exists at WSMR main post; Las Cruces is the proxy and sits lower/west of the Organs.</li></ul></details>`}
+
+/* ---- About ---- */
+function aboutView(){const t=(rows,cols,hd)=>`<table><tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c]??'—'}</td>`).join('')}</tr>`).join('')}</table>`;const S=D.skill;
+ return `<h2>Accuracy & about</h2>
+ <div class="card"><p>Forecasts correct HRRR (days 1–2) and GEFS/ECMWF/NBM (days 1–10) with local station/gauge history and terrain. Lower error = better.</p>
+ <p class="muted">Issued ${D.issued}. Guidance: HRRR ${D.guidance.hrrr||'n/a'}, NBM ${D.guidance.nbm}, GEFS ${D.guidance.gefs}, ECMWF ${D.guidance.ecmwf}.</p></div>
+ <details class="card" open><summary>Rain-chance accuracy by lead day</summary>${(()=>{const rows=S.lr_precip.filter(r=>/^\d+$/.test(String(r.key))).map(r=>({dow:'D'+r.key,d:+r.key,date:'',...r}));return chart(rows,[{n:'NBM',u:'Brier',c:'#94a3b8',v:d=>d.BS_nbm,dp:3},{n:'This model',u:'Brier',c:'#2563eb',v:d=>d.BS_model,dp:3},{n:'Climatology',u:'Brier',c:'#cbd5e1',v:d=>d.BS_clim,dp:3}],{title:'Daily rain-chance skill',sub:'Brier score 0–1; lower is better.',L:{t:'Brier score (lower better)',min:0},xt:'Forecast lead day'})})()}</details>
+ <details class="card"><summary>Gust error by lead day</summary>${chart(S.lr_wind.filter(r=>r.var=='gmax'&&/^\d+$/.test(String(r.lead_day))).sort((a,b)=>a.lead_day-b.lead_day).map(r=>({dow:'D'+r.lead_day,d:r.lead_day,date:'',...r})),[{n:'NBM (adjusted)',u:'mph',c:'#94a3b8',v:r=>r.MAE_nbm_hadj_biascorr==null?null:r.MAE_nbm_hadj_biascorr*2.237,dp:1},{n:'This model',u:'mph',c:'#f59e0b',v:r=>r.MAE_model==null?null:r.MAE_model*2.237,dp:1}],{title:'Daily max gust error',sub:'Mean absolute error in mph; lower is better.',L:{t:'Mean abs. error (mph)',min:0},xt:'Forecast lead day'})}</details>
+ <details class="card"><summary>Uncertainty ranges & caveats</summary>
+  <p>Dashed lines on charts are the 10th–90th percentile (an 80% range).</p>
+  ${(D.uncertainty&&D.uncertainty.rows||[]).length?t(D.uncertainty.rows,['what','days','nominal','covered'],['Quantity','Lead','Nominal','Actually inside']):''}
+  <ul><li>No on-site wind record at Hawk St or the Pass.</li><li>Rain gauges undercatch snow.</li><li>Visibility, thunder, hail, freezing rain and sleet are mostly raw guidance.</li></ul></details>`}
+
+/* ---- Maps ---- */
+let MAP=null,timer=null;
+function mapsView(){return `<div class="sec">Maps</div><div class="mapctl"><button id="mRadar" class="on">Radar</button><button id="mSat">Satellite</button><button id="mQpf">Forecast rain</button><button id="mPlay">⏸</button><input type="range" id="mSlide" min="0" max="0" value="0"><span id="mTime" class="muted"></span></div><div id="map"></div><div id="mLeg" class="mapleg"></div><p class="muted">Radar: RainViewer. Forecast rain: ${D.qpf_map?D.qpf_map.source:''} (6-hour totals). Satellite: NASA GIBS GOES-East IR. Base © OpenStreetMap.</p>`}
 async function initMap(){if(!window.L){setTimeout(initMap,200);return}
- MAP=L.map('map',{zoomControl:true}).setView([32.7,-106.1],8);const dark=(document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))=='dark';
+ MAP=L.map('map',{zoomControl:true}).setView([32.7,-106.1],8);
  L.tileLayer(`https://tile.openstreetmap.org/{z}/{x}/{y}.png`,{attribution:'© OpenStreetMap contributors',maxZoom:12}).addTo(MAP);
  Object.entries(D.points).forEach(([k,p])=>L.marker([p.lat,p.lon]).addTo(MAP).bindPopup(`<b>${p.name}</b><br>${D.sites[k].days[0].hi||''}°/${D.sites[k].days[0].lo||''}° · rain ${pct(D.sites[k].days[0].pop)}`));
  let rv=null;try{rv=await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json()}catch(e){}
@@ -217,18 +294,21 @@ async function initMap(){if(!window.L){setTimeout(initMap,200);return}
  const fmt=d=>d.toLocaleString('en-US',{weekday:'short',hour:'numeric',minute:'2-digit',timeZone:'America/Denver'});
  function draw(i){idx=i;sl.value=i;if(cur)MAP.removeLayer(cur);if(!frames.length){tl.textContent='No frames available';return}cur=frames[i].layer().addTo(MAP);tl.textContent=frames[i].t1?`${fmt(frames[i].t)} → ${fmt(frames[i].t1)} MT`:fmt(frames[i].t)+' MT'}
  function set(m){['mRadar','mSat','mQpf'].forEach(b=>document.getElementById(b).classList.toggle('on',b==({radar:'mRadar',sat:'mSat',qpf:'mQpf'})[m]));frames=modes[m]();sl.max=Math.max(0,frames.length-1);draw(m=='qpf'?0:Math.max(0,frames.length-1));
-  document.getElementById('mLeg').innerHTML=m=='qpf'&&D.qpf_map?'6-h rain (in): '+D.qpf_map.legend.map(([v,c])=>`<span style="background:rgba(${c[0]},${c[1]},${c[2]},.9)">≥${v}</span>`).join(''):(m=='radar'?'Radar reflectivity (light → heavy: blue, green, yellow, red)':'Infrared satellite (brighter = colder cloud tops)')}
+  document.getElementById('mLeg').innerHTML=m=='qpf'&&D.qpf_map?'6-h rain (in): '+D.qpf_map.legend.map(([v,c])=>`<span style="background:rgba(${c[0]},${c[1]},${c[2]},.9)">≥${v}</span>`).join(''):(m=='radar'?'Radar reflectivity (light → heavy)':'Infrared satellite (brighter = colder tops)')}
  document.getElementById('mRadar').onclick=()=>set('radar');document.getElementById('mSat').onclick=()=>set('sat');document.getElementById('mQpf').onclick=()=>set('qpf');
  sl.oninput=()=>draw(+sl.value);document.getElementById('mPlay').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸':'▶'};
  clearInterval(timer);timer=setInterval(()=>{if(playing&&frames.length>1)draw((idx+1)%frames.length)},900);set('radar')}
-// ---------- router ----------
+
+/* ---- Router ---- */
 function route(){const h=(location.hash||'#wsmr_hawk').slice(1);const sel=document.getElementById('loc');clearInterval(timer);
  document.querySelectorAll('.topbtns button[data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p==h));
  if(D.sites[h]){sel.value=h;localStorage.loc=h;document.getElementById('app').innerHTML=locView(h)}
  else if(h=='maps'){document.getElementById('app').innerHTML=mapsView();initMap()}
- else if(V[h])document.getElementById('app').innerHTML=V[h]();scrollTo(0,0)}
+ else if(h=='seas')document.getElementById('app').innerHTML=seasView();
+ else if(h=='about')document.getElementById('app').innerHTML=aboutView();
+ scrollTo(0,0)}
 document.getElementById('loc').onchange=e=>location.hash=e.target.value;
 document.querySelectorAll('.topbtns button[data-p]').forEach(b=>b.onclick=()=>location.hash=b.dataset.p);
 window.addEventListener('hashchange',route);
-fetch('data.json',{cache:'no-cache'}).then(r=>r.json()).then(j=>{D=j;if(!location.hash)location.hash=localStorage.loc||'wsmr_hawk';route()});
+fetch('data.json',{cache:'no-cache'}).then(r=>r.json()).then(j=>{D=j;if(!location.hash)location.hash=localStorage.loc||'wsmr_hawk';route()}).catch(e=>{document.getElementById('app').innerHTML='<p class="muted">Could not load forecast data.</p>'});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
