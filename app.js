@@ -70,7 +70,7 @@ function amtChart(ds,title){
   {n:'If it rains: likely low',u:'in',c:'#7dd3fc',v:d=>d.amt&&d.amt.c25_in,dp:2,marker:'circle'},
   {n:'If it rains: likely high',u:'in',c:'#0369a1',v:d=>d.amt&&d.amt.c75_in,dp:2,marker:'circle'},
   {n:'If it rains: could reach',u:'in',c:'#64748b',v:d=>d.amt&&d.amt.c90_in,dp:2,dash:1}];
- if(hasSnow)series.push({n:'Snow (inches of snow)',u:'in of snow',c:'#6366f1',bar:1,pat:'diag',v:d=>d.amt&&d.amt.snow_in,dp:1});
+ if(hasSnow)series.push({n:'Snow',u:'in of snow',c:'#6366f1',bar:1,pat:'diag',v:d=>d.amt&&d.amt.snow_in,dp:1});
  return `<div class="card">${chart(ds,series,{title:title||'Precipitation amounts',sub:'Bars = expected liquid (chance × typical wet amount). Lines = amount if rain falls. Snow is inches of snow, not liquid.',L:{t:'Amount (inches)',min:0}})}
  <p class="muted" style="margin-top:8px">${LEG}</p></div>`}
 function ptypeChart(s,ds){ds=ds||s.days;
@@ -78,7 +78,7 @@ function ptypeChart(s,ds){ds=ds||s.days;
  const act=T.filter(([k])=>ds.some(d=>d.hz&&d.hz.ptype_abs&&(d.hz.ptype_abs[k]||0)>0.5));
  let g=`<div class="card">`;
  if(!act.length)return g+`<div class="chtitle">Precipitation chance by type</div><p class="none">No rain, snow, sleet or ice expected in this period.</p></div>`;
- const series=act.map(([k,p],i)=>({n:p.n,u:'%',c:p.c,pat:p.pat,bar:k==='rain'||act.length===1,marker:k==='snow'?'diamond':k==='sleet'?'tri':k==='frzr'?'diamond':'circle',v:d=>d.hz&&d.hz.ptype_abs?d.hz.ptype_abs[k]:null,lab:act.length<=2}));
+ const series=act.map(([k,p],i)=>({n:p.n,u:'%',c:p.c,pat:p.pat,bar:1,v:d=>d.hz&&d.hz.ptype_abs?d.hz.ptype_abs[k]:null,lab:act.length<=3}));
  return g+chart(ds,series,{title:'Precipitation chance by type',sub:'Daily chance of each type. Types with ~0% chance are hidden. Colors and patterns stay the same everywhere in the app.',L:{t:'Daily chance (%)',min:0,max:100}})+`</div>`}
 function thunderChart(s,ds){const wk=!!ds;ds=ds||s.days;
  if(!ds.some(d=>d.hz&&(d.hz.nbm_tstm||0)>=5))return'';
