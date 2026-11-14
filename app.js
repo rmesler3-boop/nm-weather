@@ -172,6 +172,8 @@ function weekendCards(s){const w=s.days.filter(d=>D.weekend.includes(d.d));
   <div style="margin-top:4px">💨 Gusts ${f(d.gust_mph)} mph</div>
   <div class="chips">${accChips(d)}${hzChips(d)}</div></div>`).join('')}</div>`}
 
+function organLikelyNote(k){const t=(D.organ_likely_note||{})[k];if(!t)return'';return `<div class="card note"><p style="margin:0">${t}</p></div>`;}
+
 function details(k,s){
  const pass=k==='san_augustin_pass', cloud=k==='cloudcroft';
  const ds=cloud?s.days.filter(d=>D.weekend.includes(d.d)):s.days;
@@ -183,7 +185,7 @@ function details(k,s){
   o+=`<p class="muted">HRRR minimum visibility: day 1 ${f(s.days[0].vis_min_mi,1)} mi, day 2 ${f(s.days[1].vis_min_mi,1)} mi.</p>`;
  }
  o+=`</details>`;
- if(k==='wsmr_hawk')o+=`<details class="card"><summary>Storm & pattern discussion</summary>${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p class="muted">Nothing notable.</p>'}
+ if(k==='wsmr_hawk')o+=`<details class="card"><summary>Storm & pattern discussion</summary>${organLikelyNote('wsmr_hawk')}${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p class="muted">Nothing notable.</p>'}
   <h3 style="margin-top:10px">Pattern notes</h3><ul>${D.hawk_disc.join('')}</ul>
   <details style="margin-top:8px"><summary>NWS El Paso Area Forecast Discussion</summary><pre>${D.afd.replace(/</g,'&lt;')}</pre></details></details>`;
  if(cloud)o+=`<details class="card"><summary>Full 10-day list</summary>${s.days.map(d=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>${dayLab(d)}</b> · 💧 ${pct(d.pop)} · ${amt(d)} · gust ${f(d.gust_mph)} mph ${accChips(d)}</div>`).join('')}</details>`;
@@ -206,6 +208,7 @@ function passView(){const s=D.sites.san_augustin_pass,a=D.pass_alert,T=D.thresho
   ${a.near.length?`<div class="card note"><h3>Near threshold (not an alert)</h3>${a.near.map(x=>`<div>${x}</div>`).join('')}</div>`:''}
   <div class="card"><p class="muted" style="margin:0">Alerts fire for: gusts ≥${T.gust_mph} mph, sustained ≥${T.wind_mph} mph, visibility under ${T.vis_mi} mi, any snow, freezing rain or sleet.</p></div>
   ${whatMatters('san_augustin_pass',s)}
+  ${organLikelyNote('san_augustin_pass')}
   ${details('san_augustin_pass',s)}`}
 
 function locView(k){
