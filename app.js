@@ -10,13 +10,39 @@ const PTYPE={
   frzr:{n:'Freezing rain / ice',u:'%',c:'#db2777',pat:'hatch'},
   sleet:{n:'Sleet',u:'%',c:'#9333ea',pat:'dots'}
 };
-const LEG='Rain % = chance of measurable rain (≥0.01″). “If it rains, likely X–Y″” is the middle half of the amount when rain does fall; “could reach” is the high end (90th percentile) if it rains.';
+const LEG='Chance = chance of measurable precipitation (≥0.01″ liquid equivalent). On rain days, “if it rains, likely X–Y″” is the middle half of the liquid amount when it falls; “could reach” is the high end (90th percentile). Snow amounts are inches of snow, not liquid.';
 const crng=a=>a&&a.c25_in!=null?`if it rains, likely ${f(a.c25_in,2)}–${f(a.c75_in,2)}″, could reach ${f(a.c90_in,2)}″`:'';
-const amtShort=a=>a&&a.c25_in!=null?`${f(a.c25_in,2)}–${f(a.c75_in,2)}″`:'';
-const amt=d=>{const a=d.amt||{};return `<span title="${LEG}">${crng(a)}</span>`};
-const accChips=d=>{const a=d.amt||{};return ((a.snow_in||0)>=0.05?`<span class="chip s">❄️ snow ${f(a.snow_in,1)}″ (snow, not liquid)</span>`:'')+((a.ice_in||0)>=0.005?`<span class="chip i">🧊 ice ${f(a.ice_in,2)}″</span>`:'')};
+const PTYPE_LAB={dry:'Dry / none expected',rain:'Rain',snow:'Snow',mix:'Rain/snow mix',ice:'Freezing rain/sleet'};
+function ptypeOf(d){if(d&&d.ptype)return d.ptype;
+ const pop=d.pop||0,a=d.amt||{},pt=(d.hz&&d.hz.ptype_abs)||{},flags=(d.hz&&d.hz.flags)||[];
+ const snowIn=a.snow_in||d.snow_in||0,iceIn=a.ice_in||0,rainP=pt.rain||0,snowP=pt.snow||0,frzrP=pt.frzr||0,sleetP=pt.sleet||0;
+ const wet=pop>=0.10||snowIn>=0.10||iceIn>=0.01||flags.includes('freezing rain')||flags.includes('sleet');
+ if(!wet)return'dry';
+ const hasIce=flags.includes('freezing rain')||flags.includes('sleet')||iceIn>=0.01||frzrP>=10||sleetP>=10;
+ const hasSnow=snowP>=5||snowIn>=0.10,hasRain=rainP>=5;
+ if(hasIce)return'ice';if(hasSnow&&hasRain)return'mix';if(hasSnow)return'snow';return'rain'}
+const ptypeLab=d=>d.ptype_label||PTYPE_LAB[ptypeOf(d)]||'';
+function dayHead(d){if(d&&d.headline)return d.headline;
+ const k=ptypeOf(d),lab=d.d===1?'Today':(d.dow||''),pop=d.pop||0,sn=(d.amt&&d.amt.snow_in)||d.snow_in||0;
+ if(k==='dry')return `${lab}: Dry`;
+ const pct_=pct(pop),snowbit=sn>=0.05?`, ${f(sn,1)}″ of snow`:'';
+ if(k==='snow')return pop>=.5?`${lab}: Snow likely (${pct_})${snowbit}`:`${lab}: Chance of snow (${pct_})${snowbit}`;
+ if(k==='mix')return `${lab}: Rain/snow mix (${pct_})`+(sn>=0.05?`, Snow: ${f(sn,1)}″ of snow`:'');
+ if(k==='ice')return `${lab}: Freezing rain/sleet (${pct_})`+snowbit;
+ return pop>=.5?`${lab}: Rain likely (${pct_})`:`${lab}: Chance of rain (${pct_})`}
+function amtLine(d){const k=ptypeOf(d),a=d.amt||{},sn=a.snow_in||0,ice=a.ice_in||0;
+ if(k==='dry')return'';
+ if(k==='snow')return sn>=0.05?`Snow: ${f(sn,1)}″ of snow`:'Snow possible';
+ if(k==='mix'){const parts=sn>=0.05?[`Snow: ${f(sn,1)}″ of snow`]:[];if(crng(a))parts.push(crng(a)+' (liquid)');return parts.join('; ')}
+ if(k==='ice'){const parts=['Freezing rain/sleet'];if(ice>=0.01)parts.push(`ice ${f(ice,2)}″`);if(sn>=0.05)parts.push(`Snow: ${f(sn,1)}″ of snow`);if(a.c25_in!=null)parts.push(`liquid equivalent: likely ${f(a.c25_in,2)}–${f(a.c75_in,2)}″, could reach ${f(a.c90_in,2)}″`);return parts.join('; ')}
+ return crng(a)}
+const amtShort=d=>{const k=ptypeOf(d),a=(d&&d.amt)||d||{};
+ if(k==='snow'||k==='mix'){const sn=a.snow_in||0;return sn>=0.05?`${f(sn,1)}″ snow`:(a.c25_in!=null?`${f(a.c25_in,2)}–${f(a.c75_in,2)}″`:'')}
+ return a&&a.c25_in!=null?`${f(a.c25_in,2)}–${f(a.c75_in,2)}″`:''};
+const amt=d=>`<span title="${LEG}">${amtLine(d)}</span>`;
+const accChips=d=>{const a=d.amt||{};return ((a.snow_in||0)>=0.05?`<span class="chip s">❄️ ${f(a.snow_in,1)}″ of snow</span>`:'')+((a.ice_in||0)>=0.005?`<span class="chip i">🧊 ice ${f(a.ice_in,2)}″</span>`:'')};
 const HZI={'thunder':'⚡ Thunder','hail':'🧊 Hail','freezing rain':'🧊 Freezing rain','sleet':'🌨️ Sleet'};
-function icon(d){const s=(d.sky||'').toLowerCase();if((d.amt&&d.amt.snow_in||0)>=0.5)return'🌨️';if(d.pop>=.5)return'🌧️';if(d.pop>=.25)return'🌦️';if(d.gust_mph>=35)return'💨';
+function icon(d){const k=ptypeOf(d);if(k==='snow'||k==='mix')return'🌨️';if(k==='ice')return'🧊';const s=(d.sky||'').toLowerCase();if(d.pop>=.5)return'🌧️';if(d.pop>=.25)return'🌦️';if(d.gust_mph>=35)return'💨';
  if(s.includes('cloudy')&&!s.includes('partly')&&!s.includes('mostly sunny'))return'☁️';if(s.includes('partly'))return'⛅';if(s.includes('mostly'))return'🌤️';return'☀️'}
 function wxIcon(short,day){const s=(short||'').toLowerCase();if(/thunder|t-storm/.test(s))return'⛈️';if(/snow|flurr/.test(s))return'🌨️';if(/sleet|freezing|ice/.test(s))return'🧊';if(/rain|shower|drizzle/.test(s))return day?'🌦️':'🌧️';
  if(/fog|haze|smoke|dust/.test(s))return'🌫️';if(/wind|breezy/.test(s)&&!/sunny|clear/.test(s))return'💨';if(/mostly cloudy|overcast|^cloudy/.test(s))return'☁️';if(/partly/.test(s))return day?'⛅':'☁️';if(/mostly sunny|mostly clear/.test(s))return day?'🌤️':'🌙';return day?'☀️':'🌙'}
@@ -66,12 +92,13 @@ function hzChips(d){const h=d.hz||{};return (h.flags||[]).map(x=>`<span class="c
 
 function amtChart(ds,title){
  const hasSnow=ds.some(d=>d.amt&&d.amt.snow_in>=0.05);
+ const cond=hasSnow?'If precip falls (liquid)':'If it rains';
  const series=[{n:'Expected liquid',u:'in',c:'#0284c7',bar:1,v:d=>d.amt&&d.amt.mean_in,dp:2},
-  {n:'If it rains: likely low',u:'in',c:'#7dd3fc',v:d=>d.amt&&d.amt.c25_in,dp:2,marker:'circle'},
-  {n:'If it rains: likely high',u:'in',c:'#0369a1',v:d=>d.amt&&d.amt.c75_in,dp:2,marker:'circle'},
-  {n:'If it rains: could reach',u:'in',c:'#64748b',v:d=>d.amt&&d.amt.c90_in,dp:2,dash:1}];
+  {n:cond+': likely low',u:'in',c:'#7dd3fc',v:d=>d.amt&&d.amt.c25_in,dp:2,marker:'circle'},
+  {n:cond+': likely high',u:'in',c:'#0369a1',v:d=>d.amt&&d.amt.c75_in,dp:2,marker:'circle'},
+  {n:cond+': could reach',u:'in',c:'#64748b',v:d=>d.amt&&d.amt.c90_in,dp:2,dash:1}];
  if(hasSnow)series.push({n:'Snow',u:'in of snow',c:'#6366f1',bar:1,pat:'diag',v:d=>d.amt&&d.amt.snow_in,dp:1});
- return `<div class="card">${chart(ds,series,{title:title||'Precipitation amounts',sub:'Bars = expected liquid (chance × typical wet amount). Lines = amount if rain falls. Snow is inches of snow, not liquid.',L:{t:'Amount (inches)',min:0}})}
+ return `<div class="card">${chart(ds,series,{title:title||'Precipitation amounts',sub:'Bars = expected liquid (chance × typical wet amount). Lines = liquid amount if precipitation falls. Snow is inches of snow, not liquid.',L:{t:'Amount (inches)',min:0}})}
  <p class="muted" style="margin-top:8px">${LEG}</p></div>`}
 function ptypeChart(s,ds){ds=ds||s.days;
  const T=[['rain',PTYPE.rain],['snow',PTYPE.snow],['frzr',PTYPE.frzr],['sleet',PTYPE.sleet]];
@@ -96,25 +123,38 @@ function hero(k,s){const n=s.now||{},d1=s.days[0],h0=(s.hourly||[])[0]||{};const
  <div class="cond">${n.text||h0.short||''}</div><div class="hl">H ${d1.hi||'—'}° · L ${d1.lo||'—'}°${n.wind_mph!=null?` · Wind ${Math.round(n.wind_mph)}${n.gust_mph?' g'+Math.round(n.gust_mph):''} mph`:''}</div>
  <div class="src">${n.station?`Now: ${n.station}, ${ago(n.time)}`:'Current obs unavailable; showing forecast'} · Updated ${D.issued}</div></div>`}
 
+function stormAmt(st){const sn=st.snow_in||0,ice=st.ice_in||0;
+ if(sn>=0.05) return `Snow: ${f(sn,1)}″ of snow`+(st.mean_in?` (expected liquid ${f(st.mean_in,2)}″)`:'')+`, peak chance ${st.peak_pop}%`;
+ if(ice>=0.01) return `Ice ${f(ice,2)}″, expected liquid ${f(st.mean_in,2)}″, peak chance ${st.peak_pop}%`;
+ return `about ${f(st.mean_in,2)}″ expected liquid (peak daily chance ${st.peak_pop}%)`}
+function precipIcon(k){return k==='snow'||k==='mix'?'🌨️':k==='ice'?'🧊':'💧'}
 function whatMatters(k,s){
  const days=k==='cloudcroft'?s.days.filter(d=>D.weekend.includes(d.d)):s.days;
- const wet=days.filter(d=>(d.pop||0)>=0.2).sort((a,b)=>b.pop-a.pop)[0];
+ const wetDays=days.filter(d=>ptypeOf(d)!=='dry').sort((a,b)=>(b.pop||0)-(a.pop||0));
+ const wet=wetDays[0];
  const windy=days.filter(d=>(d.gust_mph||0)>=25).sort((a,b)=>b.gust_mph-a.gust_mph)[0];
  const hz=days.filter(d=>d.hz&&d.hz.flags&&d.hz.flags.length);
+ const later=k==='cloudcroft'?s.days.filter(d=>!D.weekend.includes(d.d)&&ptypeOf(d)!=='dry'):[];
  const st=(D.storms[k]||[])[0];
  let lead='';
  if(k==='san_augustin_pass'){
    const a=D.pass_alert;
    lead=a.alert?`Drive carefully: ${a.reasons[0].replace(/^[^:]+:\s*/,'')}`:'No pass alerts for high wind, low visibility, snow or ice in the next 10 days.';
- }else if(wet&&wet.pop>=0.5){
-   const a=wet.amt||{};lead=`${wet.d===1?'Today':wet.dow}: ${pct(wet.pop)} chance of rain — ${crng(a)||'amounts uncertain'}.`;
- }else if(st){lead=`Next storm ${st.name}: about ${f(st.mean_in,2)}″ expected liquid (peak daily chance ${st.peak_pop}%).`;
- }else if(wet){lead=`Best rain chance is ${wet.d===1?'today':wet.dow} (${pct(wet.pop)}). ${crng(wet.amt||{})||'Mostly dry otherwise.'}`;
+ }else if(k==='cloudcroft'){
+   lead=days.map(d=>dayHead(d)).join('. ')+'.';
+   if(later.length){const main=later.slice().sort((a,b)=>(b.pop||0)-(a.pop||0))[0];lead+=` After the weekend: ${dayHead(main)}.`;}
+ }else if(wet&&(wet.pop||0)>=0.5){
+   lead=`${dayHead(wet)}${amtLine(wet)?'. '+amtLine(wet):''}.`;
+ }else if(st){lead=`Next storm ${st.name}: ${stormAmt(st)}.`;
+ }else if(wet){lead=`${dayHead(wet)}${amtLine(wet)?'. '+amtLine(wet):''}.`;
  }else lead='Mostly dry over this period. No strong storm signal.';
  if(windy&&windy.gust_mph>=35&&k!=='san_augustin_pass')lead+=` Windy ${windy.d===1?'today':windy.dow}, gusts near ${f(windy.gust_mph)} mph.`;
  let rows='';
- if(wet){const a=wet.amt||{};rows+=`<div class="row"><div>💧</div><div><b>Precipitation${wet.d===1?' today':' — '+wet.dow}</b><span class="muted"> · ${pct(wet.pop)} chance of measurable rain</span><br>${crng(a)||'Amount uncertain'}${(a.snow_in||0)>=0.05?` · ❄️ ${f(a.snow_in,1)}″ of snow`:''}${(a.ice_in||0)>=0.005?` · 🧊 ${f(a.ice_in,2)}″ ice`:''}</div></div>`}
- else rows+=`<div class="row"><div>💧</div><div><b>Precipitation</b><br><span class="muted">No meaningful rain chance in view.</span></div></div>`;
+ if(wetDays.length){
+  rows+=wetDays.map(d=>{const knd=ptypeOf(d);return `<div class="row"><div>${precipIcon(knd)}</div><div><b>${dayHead(d)}</b><span class="muted"> · ${ptypeLab(d)}</span><br>${amtLine(d)||'Amount uncertain'}</div></div>`}).join('');
+ }else if(later.length){
+  rows+=`<div class="row"><div>💧</div><div><b>Precipitation this weekend</b><br><span class="muted">No rain or snow expected this weekend. Later chances are in “After the weekend” below.</span></div></div>`;
+ }else rows+=`<div class="row"><div>💧</div><div><b>Precipitation</b><br><span class="muted">No precipitation expected in this period.</span></div></div>`;
  if(windy)rows+=`<div class="row"><div>💨</div><div><b>Wind${windy.d===1?' today':' — '+windy.dow}</b><br>Gusts up to about ${f(windy.gust_mph)} mph (sustained ~${f(windy.wind_mph)} mph).</div></div>`;
  else rows+=`<div class="row"><div>💨</div><div><b>Wind</b><br><span class="muted">No strong winds expected.</span></div></div>`;
  if(hz.length)rows+=`<div class="row"><div>⚡</div><div><b>Hazards</b><br>${hz.map(d=>`${d.d===1?'Today':d.dow}: ${(d.hz.flags||[]).map(x=>HZI[x]||x).join(', ')}`).join(' · ')}</div></div>`;
@@ -142,35 +182,48 @@ function nowcastCard(k){const N=D.nowcast;if(!N||!N.points||!N.points[k]){const 
 
 function hourStrip(s){const H=s.hourly||[];if(!H.length)return'';
  return `<div class="sec">Next 48 hours</div><div class="card"><div class="hours">${H.map((h,i)=>`<div class="hr"><div class="h">${i?hh(h.t):'Now'}</div><div class="i">${wxIcon(h.short,h.day)}</div><div class="tt">${h.temp}°</div><div class="p">${h.pop>=10?h.pop+'%':''}</div><div class="w">${(h.wind||'').replace(' mph','').replace(' to ','–')}${h.gust_corr?' g'+h.gust_corr:''}</div></div>`).join('')}</div>
- <div class="muted">Temps & rain % from NWS; gusts (“g”) from this app’s correction where available.</div></div>`}
+ <div class="muted">Temps & precipitation chance from NWS; gusts (“g”) from this app’s correction where available.</div></div>`}
 
 function stormCards(key,dayFilter){let S=(D.storms[key]||[]);if(dayFilter)S=S.filter(x=>x.days.some(d=>dayFilter.includes(d)));
  if(!S.length)return `<div class="card"><p class="none">No storm events expected${dayFilter?' this weekend':' in the next 10 days'}.</p></div>`;
- return `<div class="wk">${S.map(x=>`<div class="card storm"><div style="font-weight:700">${x.name}</div><div class="muted">${x.start} → ${x.end}</div><div class="big" style="font-size:22px">${f(x.mean_in,2)}″</div><div class="muted">expected liquid · peak chance ${x.peak_pop}%</div><div class="muted">${crng(x)}</div><div class="chips">${x.snow_in>=0.05?`<span class="chip s">❄️ ${f(x.snow_in,1)}″ snow (in of snow)</span>`:''}${x.ice_in>=0.01?`<span class="chip i">🧊 ${f(x.ice_in,2)}″ ice</span>`:''}</div></div>`).join('')}</div>`}
+ return `<div class="wk">${S.map(x=>{const sn=x.snow_in||0,icy=x.ice_in||0;
+  const big=sn>=0.05?`${f(sn,1)}″ of snow`:`${f(x.mean_in,2)}″`;
+  const sub=sn>=0.05?`inches of snow · expected liquid ${f(x.mean_in,2)}″ · peak chance ${x.peak_pop}%`:`expected liquid · peak chance ${x.peak_pop}%`;
+  const amt=sn>=0.05?(x.c25_in!=null?`liquid equivalent: likely ${f(x.c25_in,2)}–${f(x.c75_in,2)}″, could reach ${f(x.c90_in,2)}″`:''):crng(x);
+  return `<div class="card storm ${sn>=0.05?'snowy':''}"><div style="font-weight:700">${x.name}</div><div class="muted">${x.start} → ${x.end}</div><div class="big" style="font-size:22px">${big}</div><div class="muted">${sub}</div><div class="muted">${amt}</div><div class="chips">${sn>=0.05?`<span class="chip s">❄️ ${f(sn,1)}″ of snow</span>`:''}${icy>=0.01?`<span class="chip i">🧊 ${f(icy,2)}″ ice</span>`:''}</div></div>`}).join('')}</div>`}
 
 function tenDay(s){const his=s.days.map(d=>+d.hi).filter(x=>!isNaN(x)),los=s.days.map(d=>+d.lo).filter(x=>!isNaN(x));const mn=Math.min(...los,0),mx=Math.max(...his,1),sp=Math.max(1,mx-mn);
- return `<div class="sec">10-day forecast</div><div class="card" style="padding:4px 10px">${s.days.map(d=>{const lo=+d.lo,hi=+d.hi,ok=!isNaN(lo)&&!isNaN(hi);const a=d.amt||{};
+ return `<div class="sec">10-day forecast</div><div class="card" style="padding:4px 10px">${s.days.map(d=>{const lo=+d.lo,hi=+d.hi,ok=!isNaN(lo)&&!isNaN(hi);const knd=ptypeOf(d);
   return `<div class="dl" onclick="this.classList.toggle('open')"><div class="dw">${d.d==1?'Today':d.dow}</div><div class="ic">${icon(d)}</div>
-  <div class="pp">${(d.pop||0)>=.1?`💧 ${pct(d.pop)}<span class="amt">${amtShort(a)||''}${(a.snow_in||0)>=0.05?` · ❄️${f(a.snow_in,1)}″`:''}</span>`:'—'}</div>
+  <div class="pp ${knd}">${knd==='dry'?'—':`${precipIcon(knd)} ${pct(d.pop)}<span class="amt">${amtShort(d)||''}</span>`}</div>
   <div class="lo">${ok?lo+'°':'—'}</div><div class="bar">${ok?`<i style="left:${(lo-mn)/sp*100}%;right:${(mx-hi)/sp*100}%"></i>`:''}</div><div class="hi">${ok?hi+'°':''}</div>
   <div class="dlx">${d.sky?`<div style="margin-bottom:4px">${d.sky}</div>`:''}
-   <div><b>Rain:</b> ${pct(d.pop)} chance. ${amt(d)||'—'}</div>
+   <div class="wxhead">${dayHead(d)}</div>
+   <div><b>${ptypeLab(d)}:</b> ${knd==='dry'?'None expected.':(knd==='rain'?`${pct(d.pop)} chance of precipitation. ${amtLine(d)||'—'}`:`${pct(d.pop)} chance of precipitation. ${amtLine(d)||'—'}`)}</div>
    <div><b>Wind:</b> ${f(d.wind_mph)} mph, gusts ${f(d.gust_mph)} mph${d.gust_rng?` (80% range ${rg(d.gust_rng)} mph)`:''}</div>
    <div class="chips">${accChips(d)}${hzChips(d)}</div>
    <details style="margin-top:6px"><summary class="muted">NWS forecast for comparison</summary>${nwsTxt(d)}</details>
   </div></div>`}).join('')}
-  <p class="muted" style="font-size:12px;margin:8px 0 4px">Tap a day for details. 💧 ${LEG}</p></div>`}
+  <p class="muted" style="font-size:12px;margin:8px 0 4px">Tap a day for details. ${LEG}</p></div>`}
 
 function weekendCards(s){const w=s.days.filter(d=>D.weekend.includes(d.d));
  const t=D.totals.cloudcroft;
+ const later=s.days.filter(d=>!D.weekend.includes(d.d)&&ptypeOf(d)!=='dry');
+ const dryWeekend=w.every(d=>ptypeOf(d)==='dry')&&(t.snow_in||0)<0.05&&(t.mean_in||0)<0.01;
+ const tot=dryWeekend
+  ?`<div class="muted">Fri–Sun precipitation</div><div class="big">Dry</div><div class="muted">No rain or snow expected this weekend.</div>`
+  :`<div class="muted">Fri–Sun precipitation</div><div class="big">${(t.snow_in||0)>=0.05?'🌨️':'💧'} ${(t.snow_in||0)>=0.05?f(t.snow_in,1)+'″ <span class="muted" style="font-size:14px">of snow</span>':f(t.mean_in,2)+'″ <span class="muted" style="font-size:14px">expected liquid</span>'}</div>
+ <div class="muted">${(t.snow_in||0)>=0.05?`Snow: ${f(t.snow_in,1)}″ of snow`+(t.c25_in!=null?` · liquid equivalent: likely ${f(t.c25_in,2)}–${f(t.c75_in,2)}″, could reach ${f(t.c90_in,2)}″`:''):(crng(t)||'')}</div>`;
+ const laterNote=later.length?`<div class="card note"><h3>After the weekend</h3>${later.map(d=>`<div class="wxhead">${dayHead(d)}</div><div class="muted">${ptypeLab(d)}${amtLine(d)?'. '+amtLine(d):''}</div>`).join('')}</div>`:'';
  return `<div class="sec">This weekend</div>
- <div class="card"><div class="muted">Fri–Sun precipitation</div><div class="big">💧 ${f(t.mean_in,2)}″ <span class="muted" style="font-size:14px">expected liquid</span></div>
- <div class="muted">${crng(t)}${t.snow_in>=0.05?` · ❄️ ${f(t.snow_in,1)}″ snow (in of snow)`:''}</div></div>
- <div class="wk">${w.map(d=>`<div class="card"><div class="muted">${d.dow} ${(d.date||'').slice(5)}</div>
+ <div class="card">${tot}</div>
+ <div class="wk">${w.map(d=>{const knd=ptypeOf(d);return `<div class="card"><div class="muted">${d.dow} ${(d.date||'').slice(5)}</div>
+  <div class="wxhead">${dayHead(d)}</div>
   <div class="big">${icon(d)} ${d.hi||''}°<span class="muted" style="font-size:15px"> / ${d.lo||''}°</span></div>
-  <div style="margin-top:6px"><b>💧 ${pct(d.pop)}</b> chance of rain</div><div class="muted">${amt(d)}</div>
+  <div><span class="ptype ${knd}">${ptypeLab(d)}</span></div>
+  ${knd==='dry'?'':`<div class="muted" style="margin-top:6px">${amtLine(d)}</div>`}
   <div style="margin-top:4px">💨 Gusts ${f(d.gust_mph)} mph</div>
-  <div class="chips">${accChips(d)}${hzChips(d)}</div></div>`).join('')}</div>`}
+  <div class="chips">${accChips(d)}${hzChips(d)}</div></div>`}).join('')}</div>${laterNote}`}
 
 function organLikelyNote(k){const t=(D.organ_likely_note||{})[k];if(!t)return'';return `<div class="card note"><p style="margin:0">${t}</p></div>`;}
 
@@ -188,7 +241,7 @@ function details(k,s){
  if(k==='wsmr_hawk')o+=`<details class="card"><summary>Storm & pattern discussion</summary>${organLikelyNote('wsmr_hawk')}${D.hawk_storm.length?'<ul>'+D.hawk_storm.map(x=>`<li>${x.replace(/^- /,'')}</li>`).join('')+'</ul>':'<p class="muted">Nothing notable.</p>'}
   <h3 style="margin-top:10px">Pattern notes</h3><ul>${D.hawk_disc.join('')}</ul>
   <details style="margin-top:8px"><summary>NWS El Paso Area Forecast Discussion</summary><pre>${D.afd.replace(/</g,'&lt;')}</pre></details></details>`;
- if(cloud)o+=`<details class="card"><summary>Full 10-day list</summary>${s.days.map(d=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b>${dayLab(d)}</b> · 💧 ${pct(d.pop)} · ${amt(d)} · gust ${f(d.gust_mph)} mph ${accChips(d)}</div>`).join('')}</details>`;
+ if(cloud)o+=`<details class="card"><summary>Full 10-day list</summary>${s.days.map(d=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="wxhead">${dayHead(d)}</div><div><span class="ptype ${ptypeOf(d)}">${ptypeLab(d)}</span> · ${pct(d.pop)} chance${amtLine(d)?'. '+amtLine(d):''} · gust ${f(d.gust_mph)} mph</div><div class="chips">${accChips(d)}</div></div>`).join('')}</details>`;
  o+=`<details class="card"><summary>How this forecast works</summary>
   <p>This app corrects national models (HRRR for days 1–2, GEFS/ECMWF/NBM for days 1–10) with local station and gauge history and terrain. Issued ${D.issued}.</p>
   <p class="muted">Guidance used: HRRR ${D.guidance.hrrr||'n/a'}, NBM ${D.guidance.nbm}, GEFS ${D.guidance.gefs}, ECMWF ${D.guidance.ecmwf}.${D.notes.length?' Notes: '+D.notes.join('; '):''}</p>
